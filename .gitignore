@@ -1,0 +1,4 @@
+*.csv
+baseballdatabank*
+register*
+__pycache__
