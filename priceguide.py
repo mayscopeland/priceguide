@@ -30,8 +30,8 @@ filepath = os.path.dirname(__file__)
 def main():
 
     # Load file
-    hitters = load_projection(system, year, True)
-    pitchers = load_projection(system, year, False)
+    hitters = load_projection(system, year, h_cats, h_pos, True)
+    pitchers = load_projection(system, year, p_cats, p_pos, False)
 
     # Build values
     hitters = build_values(hitters, h_cats, h_pos, h_split, True)
@@ -51,7 +51,7 @@ def build_values(df, cats, pos, split, is_batting):
 
     while not settled:
         df = setup_stats(df, cats, num_players, is_batting)
-        df = calc_values(df, cats, m_cats, num_players)
+        df = calc_values(df, cats, pos, m_cats, num_players)
 
         # Check if optimal grouping
         mean = df.head(num_players).mean()
@@ -155,7 +155,7 @@ def flip_neg_cats(df, cats, is_batting):
     return df
 
 
-def calc_values(df, cats, m_cats, num_players):
+def calc_values(df, cats, pos, m_cats, num_players):
 
     df = calc_z_scores(df, cats, num_players)
 
@@ -163,9 +163,9 @@ def calc_values(df, cats, m_cats, num_players):
 
     df.sort_values(by="total", inplace=True, ascending=False)
 
-    df = adjust_by_pos(df, num_players)
+    df = adjust_by_pos(df, pos)
 
-    df.sort_values(by="adj_total", inplace=True, ascending=False)
+    #df.sort_values(by="adj_total", inplace=True, ascending=False)
 
     return df
 
@@ -179,10 +179,62 @@ def calc_z_scores(df, cats, num_players):
     return df
 
 
-# TODO: add positional adjustment
-def adjust_by_pos(df, num_players):
-    last_player_picked = df.iloc[num_players]
-    df["adj_total"] = df["total"] - last_player_picked["total"]
+def adjust_by_pos(df, positions):  # sourcery skip: merge-nested-ifs
+
+    repl = {position: 100 for position in positions}
+    df["counted"] = False
+    df["adj_total"] = 0
+
+    for position in positions:
+        pos_count = positions[position] * teams
+
+        # Only look at players who are eligible at this position
+        if position == "MI":
+            df_pos = df[(df["is_2B"] == True) | (df["is_SS"] == True)]
+        elif position == "CI":
+            df_pos = df[(df["is_1B"] == True) | (df["is_3B"] == True)]
+        elif position in ["Util", "P"]:
+            df_pos = df
+        else:
+            df_pos = df[df["is_" + position] == True]
+
+        # And only look at players that we haven't counted for other positions
+        df_pos = df_pos[df_pos["counted"] == False]
+
+        # And only players who are above replacement
+        df_pos = df_pos.head(pos_count)
+
+        df_pos["counted"] = True
+        df.update(df_pos)
+
+        if position not in ["SP","RP"]:
+            print(df_pos)
+
+        # Save our replacement level for this position
+        repl[position] = df_pos["total"].min()
+        if position == "MI":
+            repl["2B"] = repl["MI"]
+            repl["SS"] = repl["MI"]
+        elif position == "CI":
+            repl["1B"] = repl["CI"]
+            repl["3B"] = repl["CI"]
+        elif position == "Util":
+            for u_pos in positions:
+                if u_pos not in ["CI","MI","Util"]:
+                    if (df_pos["is_" + u_pos] == True).any():
+                        repl[u_pos] = repl["Util"]
+
+    print(repl)
+
+    # For each position, adjust each player's total value by the
+    # replacement level. Start with the smallest adjustment and get deeper.
+    for position in sorted(repl, key=repl.get, reverse=True):
+
+        if position in ["Util", "P"]:
+            df["adj_total"] = df["total"] - repl[position]
+
+        if position not in ["CI","MI","Util","P"]:
+            df.loc[df["is_" + position]==True, "adj_total"] = df["total"] - repl[position]
 
     return df
 
@@ -202,10 +254,10 @@ def calc_dollar_values(df, pos, split, num_players):
 
 
 def remove_extra_cols(df, cats, m_cats):
-    return df[["mlbam_id", "Name"] + cats + m_cats + ["total", "adj_total", "$"]]
+    return df[["Name"] + cats + m_cats + ["total", "adj_total", "$"]]
 
 
-def load_projection(system, year, is_batting):
+def load_projection(system, year, cats, pos, is_batting):
 
     if is_batting:
         filename = str(year) + system + "Batting.csv"
@@ -215,7 +267,7 @@ def load_projection(system, year, is_batting):
     df = pd.read_csv(filepath + "\\" + filename)
 
     df = load_mlbam_id(df)
-    df = load_games_by_pos(df)
+    df = load_games_by_pos(df, cats, pos, is_batting)
 
     return df
 
@@ -230,17 +282,28 @@ def load_mlbam_id(df):
     df = df.merge(register, left_on="playerid", right_on="key_fangraphs")
 
     df = df.rename(columns={"key_mlbam": "mlbam_id"})
+    df["mlbam_id"] = df["mlbam_id"].astype(int)
+    df = df.set_index("mlbam_id")
 
     return df
 
 
-def load_games_by_pos(df):
-    pos = pd.read_csv(filepath + "\\games_by_pos\\" + str(year - 1) + ".csv")
+def load_games_by_pos(df, cats, pos, is_batting):
+    gbp = pd.read_csv(filepath + "\\games_by_pos\\" + str(year - 1) + ".csv", index_col="mlbam_id")
+    gbp = gbp.add_prefix("G_")
 
     # Create boolean columns for positional eligibility
-    for hit_pos in h_pos:
-        if hit_pos in pos.columns:
-            pos["is_" + hit_pos] = pos[hit_pos] > h_elig
+    if is_batting:
+        for hit_pos in pos:
+            if "G_" + hit_pos in gbp.columns:
+                gbp["is_" + hit_pos] = gbp["G_" + hit_pos] > h_elig
+    else:
+        if "G_SP" in gbp.columns:
+            gbp["is_SP"] = gbp["G_SP"] > sp_elig
+        if "G_RP" in gbp.columns:
+            gbp["is_RP"] = gbp["G_RP"] > rp_elig
+
+    df = df.merge(gbp, how="left", on="mlbam_id")
 
     return df
 
