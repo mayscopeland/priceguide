@@ -3,55 +3,86 @@ import os
 
 year = 2021
 system = "Steamer"
-teams = 12
-budget = 260
-h_split = 0.7
-h_cats = ["HR", "SB", "R", "RBI", "OBP"]
-p_cats = ["W", "SV", "SO", "ERA", "WHIP"]
-h_pos = {
-    "C": 2,
-    "SS": 1,
-    "2B": 1,
-    "3B": 1,
-    "OF": 5,
-    "1B": 1,
-    "MI": 1,
-    "CI": 1,
-    "Util": 1,
-}
-p_pos = {"SP": 7, "RP": 5}
-h_elig = 8
-sp_elig = 5
-rp_elig = 5
 
 filepath = os.path.dirname(__file__)
 
 
+class League:
+    def __init__(self):
+        self.teams = 12
+        self.budget = 260
+        self.h_split = 0.7
+        self.h_cats = ["HR", "SB", "R", "RBI", "OBP"]
+        self.p_cats = ["W", "SV", "SO", "ERA", "WHIP"]
+        self.h_pos = {
+            "C": 2,
+            "SS": 1,
+            "2B": 1,
+            "3B": 1,
+            "OF": 5,
+            "1B": 1,
+            "MI": 1,
+            "CI": 1,
+            "Util": 1,
+        }
+        self.p_pos = {"SP": 7, "RP": 5}
+        self.h_elig = 8
+        self.sp_elig = 5
+        self.rp_elig = 5
+
+    @property
+    def num_hitters(self):
+        return sum(self.h_pos.values()) * self.teams
+
+    @property
+    def num_pitchers(self):
+        return sum(self.p_pos.values()) * self.teams
+
+
 def main():
 
+    lg = League()
+
     # Load file
-    hitters = load_projection(system, year, h_cats, h_pos, True)
-    pitchers = load_projection(system, year, p_cats, p_pos, False)
+    hitters = load_projection(system, year, lg, True)
+    pitchers = load_projection(system, year, lg, False)
 
     # Build values
-    hitters = build_values(hitters, h_cats, h_pos, h_split, True)
-    pitchers = build_values(pitchers, p_cats, p_pos, 1 - h_split, False)
+    hitters = build_values(hitters, lg, True)
+    pitchers = build_values(pitchers, lg, False)
+
+    # Convert to dollar values
+    hitters = calc_dollar_values(hitters, lg, True)
+    pitchers = calc_dollar_values(pitchers, lg, False)
 
     # Save the results
     save_values(system, year, pd.concat([hitters, pitchers]))
 
 
-def build_values(df, cats, pos, split, is_batting):
+def build_values(df, lg, is_batting):
     settled = False
     previous_mean = None
     penultimate_mean = None
 
-    num_players = sum(pos.values()) * teams
+    if is_batting:
+        cats = lg.h_cats
+        pos = lg.h_pos
+        num_players = lg.num_hitters
+    else:
+        cats = lg.p_cats
+        pos = lg.p_pos
+        num_players = lg.num_pitchers
+
     m_cats = ["m" + cat for cat in cats]
 
     while not settled:
         df = setup_stats(df, cats, num_players, is_batting)
-        df = calc_values(df, cats, pos, m_cats, num_players)
+        df = calc_z_scores(df, cats, num_players)
+
+        df["total"] = df[m_cats].sum(axis=1)
+        df.sort_values(by="total", inplace=True, ascending=False)
+
+        df = adjust_by_pos(df, pos, lg.teams)
 
         # Check if optimal grouping
         mean = df.head(num_players).mean()
@@ -60,9 +91,6 @@ def build_values(df, cats, pos, split, is_batting):
         else:
             penultimate_mean = previous_mean
             previous_mean = mean
-
-    # Convert to dollar values
-    df = calc_dollar_values(df, pos, split, num_players)
 
     # Clear out excess columns
     df = remove_extra_cols(df, cats, m_cats)
@@ -155,21 +183,6 @@ def flip_neg_cats(df, cats, is_batting):
     return df
 
 
-def calc_values(df, cats, pos, m_cats, num_players):
-
-    df = calc_z_scores(df, cats, num_players)
-
-    df["total"] = df[m_cats].sum(axis=1)
-
-    df.sort_values(by="total", inplace=True, ascending=False)
-
-    df = adjust_by_pos(df, pos)
-
-    #df.sort_values(by="adj_total", inplace=True, ascending=False)
-
-    return df
-
-
 def calc_z_scores(df, cats, num_players):
     for cat in cats:
         df["m" + cat] = (df[cat] - df.head(num_players)[cat].mean()) / df.head(
@@ -179,7 +192,7 @@ def calc_z_scores(df, cats, num_players):
     return df
 
 
-def adjust_by_pos(df, positions):  # sourcery skip: merge-nested-ifs
+def adjust_by_pos(df, positions, teams):
 
     repl = {position: 100 for position in positions}
     df["counted"] = False
@@ -207,7 +220,7 @@ def adjust_by_pos(df, positions):  # sourcery skip: merge-nested-ifs
         df_pos["counted"] = True
         df.update(df_pos)
 
-        if position not in ["SP","RP"]:
+        if position not in ["SP", "RP"]:
             print(df_pos)
 
         # Save our replacement level for this position
@@ -220,7 +233,7 @@ def adjust_by_pos(df, positions):  # sourcery skip: merge-nested-ifs
             repl["3B"] = repl["CI"]
         elif position == "Util":
             for u_pos in positions:
-                if u_pos not in ["CI","MI","Util"]:
+                if u_pos not in ["CI", "MI", "Util"]:
                     if (df_pos["is_" + u_pos] == True).any():
                         repl[u_pos] = repl["Util"]
 
@@ -233,18 +246,28 @@ def adjust_by_pos(df, positions):  # sourcery skip: merge-nested-ifs
         if position in ["Util", "P"]:
             df["adj_total"] = df["total"] - repl[position]
 
-        if position not in ["CI","MI","Util","P"]:
-            df.loc[df["is_" + position]==True, "adj_total"] = df["total"] - repl[position]
+        if position not in ["CI", "MI", "Util", "P"]:
+            df.loc[df["is_" + position] == True, "adj_total"] = (
+                df["total"] - repl[position]
+            )
 
     return df
 
 
-def calc_dollar_values(df, pos, split, num_players):
-    total_money = teams * budget
-    money = total_money * split
+def calc_dollar_values(df, lg, is_batting):
+    total_money = lg.teams * lg.budget
+
+    if is_batting:
+        money = total_money * lg.h_split
+        pos = lg.h_pos
+        num_players = lg.num_hitters
+    else:
+        money = total_money * (1 - lg.h_split)
+        pos = lg.p_pos
+        num_players = lg.num_pitchers
 
     # Save $1 for a minimum bid
-    money = money - (teams * sum(pos.values()))
+    money = money - (lg.teams * sum(pos.values()))
 
     total_points = df.head(num_players)["adj_total"].sum()
 
@@ -254,10 +277,10 @@ def calc_dollar_values(df, pos, split, num_players):
 
 
 def remove_extra_cols(df, cats, m_cats):
-    return df[["Name"] + cats + m_cats + ["total", "adj_total", "$"]]
+    return df[["Name"] + cats + m_cats + ["total", "adj_total"]]
 
 
-def load_projection(system, year, cats, pos, is_batting):
+def load_projection(system, year, lg, is_batting):
 
     if is_batting:
         filename = str(year) + system + "Batting.csv"
@@ -267,7 +290,7 @@ def load_projection(system, year, cats, pos, is_batting):
     df = pd.read_csv(filepath + "\\" + filename)
 
     df = load_mlbam_id(df)
-    df = load_games_by_pos(df, cats, pos, is_batting)
+    df = load_games_by_pos(df, lg, is_batting)
 
     return df
 
@@ -288,20 +311,22 @@ def load_mlbam_id(df):
     return df
 
 
-def load_games_by_pos(df, cats, pos, is_batting):
-    gbp = pd.read_csv(filepath + "\\games_by_pos\\" + str(year - 1) + ".csv", index_col="mlbam_id")
+def load_games_by_pos(df, lg, is_batting):
+    gbp = pd.read_csv(
+        filepath + "\\games_by_pos\\" + str(year - 1) + ".csv", index_col="mlbam_id"
+    )
     gbp = gbp.add_prefix("G_")
 
     # Create boolean columns for positional eligibility
     if is_batting:
-        for hit_pos in pos:
+        for hit_pos in lg.h_pos:
             if "G_" + hit_pos in gbp.columns:
-                gbp["is_" + hit_pos] = gbp["G_" + hit_pos] > h_elig
+                gbp["is_" + hit_pos] = gbp["G_" + hit_pos] > lg.h_elig
     else:
         if "G_SP" in gbp.columns:
-            gbp["is_SP"] = gbp["G_SP"] > sp_elig
+            gbp["is_SP"] = gbp["G_SP"] > lg.sp_elig
         if "G_RP" in gbp.columns:
-            gbp["is_RP"] = gbp["G_RP"] > rp_elig
+            gbp["is_RP"] = gbp["G_RP"] > lg.rp_elig
 
     df = df.merge(gbp, how="left", on="mlbam_id")
 
