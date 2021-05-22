@@ -1,8 +1,8 @@
 import pandas as pd
 import os
 
-year = 2021
-system = "Steamer"
+year = 2020
+system = ""
 
 filepath = os.path.dirname(__file__)
 
@@ -12,7 +12,7 @@ class League:
         self.teams = 12
         self.budget = 260
         self.h_split = 0.7
-        self.h_cats = ["HR", "SB", "R", "RBI", "OBP"]
+        self.h_cats = ["HR", "SB", "R", "RBI", "AVG"]
         self.p_cats = ["W", "SV", "SO", "ERA", "WHIP"]
         self.h_pos = {
             "C": 2,
@@ -26,7 +26,7 @@ class League:
             "Util": 1,
         }
         self.p_pos = {"SP": 7, "RP": 5}
-        self.h_elig = 8
+        self.h_elig = 20
         self.sp_elig = 5
         self.rp_elig = 5
 
@@ -44,8 +44,8 @@ def main():
     lg = League()
 
     # Load file
-    hitters = load_projection(system, year, lg, True)
-    pitchers = load_projection(system, year, lg, False)
+    hitters = load_stats(system, year, lg, True)
+    pitchers = load_stats(system, year, lg, False)
 
     # Build values
     hitters = build_values(hitters, lg, True)
@@ -61,8 +61,7 @@ def main():
 
 def build_values(df, lg, is_batting):
     settled = False
-    previous_mean = None
-    penultimate_mean = None
+    previous_sds = []
 
     if is_batting:
         cats = lg.h_cats
@@ -77,20 +76,19 @@ def build_values(df, lg, is_batting):
 
     while not settled:
         df = setup_stats(df, cats, num_players, is_batting)
-        df = calc_z_scores(df, cats, num_players)
+        df, sds = calc_z_scores(df, cats, num_players)
 
         df["total"] = df[m_cats].sum(axis=1)
         df.sort_values(by="total", inplace=True, ascending=False)
 
         df = adjust_by_pos(df, pos, lg.teams)
+        df.sort_values(by="adj_total", inplace=True, ascending=False)
 
         # Check if optimal grouping
-        mean = df.head(num_players).mean()
-        if mean.equals(previous_mean) or mean.equals(penultimate_mean):
+        if sds in previous_sds:
             settled = True
         else:
-            penultimate_mean = previous_mean
-            previous_mean = mean
+            previous_sds.append(sds)
 
     # Clear out excess columns
     df = remove_extra_cols(df, cats, m_cats)
@@ -184,12 +182,15 @@ def flip_neg_cats(df, cats, is_batting):
 
 
 def calc_z_scores(df, cats, num_players):
-    for cat in cats:
-        df["m" + cat] = (df[cat] - df.head(num_players)[cat].mean()) / df.head(
-            num_players
-        )[cat].std(ddof=0)
 
-    return df
+    sds = []
+    for cat in cats:
+        sd = df.head(num_players)[cat].std(ddof=0)
+        sds.append(sd)
+        mean = df.head(num_players)[cat].mean()
+        df["m" + cat] = (df[cat] - mean) / sd
+
+    return df, sds
 
 
 def adjust_by_pos(df, positions, teams):
@@ -220,9 +221,6 @@ def adjust_by_pos(df, positions, teams):
         df_pos["counted"] = True
         df.update(df_pos)
 
-        if position not in ["SP", "RP"]:
-            print(df_pos)
-
         # Save our replacement level for this position
         repl[position] = df_pos["total"].min()
         if position == "MI":
@@ -236,8 +234,6 @@ def adjust_by_pos(df, positions, teams):
                 if u_pos not in ["CI", "MI", "Util"]:
                     if (df_pos["is_" + u_pos] == True).any():
                         repl[u_pos] = repl["Util"]
-
-    print(repl)
 
     # For each position, adjust each player's total value by the
     # replacement level. Start with the smallest adjustment and get deeper.
@@ -280,16 +276,19 @@ def remove_extra_cols(df, cats, m_cats):
     return df[["Name"] + cats + m_cats + ["total", "adj_total"]]
 
 
-def load_projection(system, year, lg, is_batting):
+def load_stats(system, year, lg, is_batting):
 
     if is_batting:
         filename = str(year) + system + "Batting.csv"
     else:
         filename = str(year) + system + "Pitching.csv"
 
-    df = pd.read_csv(filepath + "\\" + filename)
+    df = pd.read_csv(filepath + "\\data\\" + filename)
 
-    df = load_mlbam_id(df)
+    if "mlbam_id" not in df.columns:
+        df = load_mlbam_id(df)
+    
+    df = load_names(df)
     df = load_games_by_pos(df, lg, is_batting)
 
     return df
@@ -310,6 +309,21 @@ def load_mlbam_id(df):
 
     return df
 
+
+def load_names(df):
+    register = pd.read_csv(
+        filepath + "\\register-master\\data\\people.csv",
+        usecols=["key_mlbam", "name_last", "name_first", "name_suffix"],
+    )
+    register = register.dropna(subset=["key_mlbam"])
+    register["key_mlbam"] = register["key_mlbam"].astype(int)
+    df["mlbam_id"] = df["mlbam_id"].astype(int)
+
+    df = df.merge(register, left_on="mlbam_id", right_on="key_mlbam")
+    df["Name"] = df["name_first"] + " " + df["name_last"]
+
+
+    return df
 
 def load_games_by_pos(df, lg, is_batting):
     gbp = pd.read_csv(
