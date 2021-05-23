@@ -321,6 +321,7 @@ def load_names(df):
 
     df = df.merge(register, left_on="mlbam_id", right_on="key_mlbam")
     df["Name"] = df["name_first"] + " " + df["name_last"]
+    df.loc[df["name_suffix"].notna(), "Name"] = df["Name"] + " " + df["name_suffix"]
 
 
     return df
