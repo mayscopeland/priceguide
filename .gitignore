@@ -1,4 +1,3 @@
-*.csv
-baseballdatabank*
-register*
+data/*.csv
+output/*.csv
 __pycache__

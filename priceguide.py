@@ -39,24 +39,32 @@ def main():
     year = 2021
     system = "OP"
 
-    print(calc_config(lg, year, system))
+    print(calc_from_standard(lg, year, system))
 
     #df = calc(lg, year, system)
 
     # Save the results
     #save_values(system, year, df)
 
-def calc_from_df(lg, hitters, pitchers):
+def calc_from_df(lg, year, hitters, pitchers):
     
+    # Add positions
+    hitters = load_games_by_pos(hitters, lg, str(year - 1), True)
+    pitchers = load_games_by_pos(pitchers, lg, str(year - 1), False)
+
     # Build values
-    hitters = build_values(hitters, lg, True)
-    pitchers = build_values(pitchers, lg, False)
+    hitters, hitting_config = build_values(hitters, lg, True)
+    pitchers, pitching_config = build_values(pitchers, lg, False)
 
     # Convert to dollar values
-    hitters = calc_dollar_values(hitters, lg, True)
-    pitchers = calc_dollar_values(pitchers, lg, False)
+    hitters, hitting_config["dollar_rate"] = calc_dollar_values(hitters, lg, True)
+    pitchers, pitching_config["dollar_rate"] = calc_dollar_values(pitchers, lg, False)
+    
+    config = {}
+    config["hitting"] = hitting_config
+    config["pitching"] = pitching_config
 
-    return pd.concat([hitters, pitchers])
+    return pd.concat([hitters, pitchers]), config
 
 def calc_from_standard(lg, year, system):
 
@@ -64,53 +72,7 @@ def calc_from_standard(lg, year, system):
     hitters = load_stats(system, year, lg, True)
     pitchers = load_stats(system, year, lg, False)
 
-    # Build values
-    hitters = build_values(hitters, lg, True)
-    pitchers = build_values(pitchers, lg, False)
-
-    # Convert to dollar values
-    hitters = calc_dollar_values(hitters, lg, True)
-    pitchers = calc_dollar_values(pitchers, lg, False)
-
-    return pd.concat([hitters, pitchers])
-
-
-def calc_config_from_df(lg, hitters, pitchers):
-
-    # Build values
-    hitters, hitting_config = build_values(hitters, lg, True)
-    pitchers, pitching_config = build_values(pitchers, lg, False)
-
-    # Convert to dollar values
-    hitters, hitting_config["dollar_rate"] = calc_dollar_values(hitters, lg, True)
-    pitchers, pitching_config["dollar_rate"] = calc_dollar_values(pitchers, lg, False)
-
-    config = {}
-    config["hitting"] = hitting_config
-    config["pitching"] = pitching_config
-
-    return config
-
-def calc_config_from_standard(lg, year, system):
-
-    # Load file
-    hitters = load_stats(system, year, lg, True)
-    pitchers = load_stats(system, year, lg, False)
-
-    # Build values
-    hitters, hitting_config = build_values(hitters, lg, True)
-    pitchers, pitching_config = build_values(pitchers, lg, False)
-
-    # Convert to dollar values
-    hitters, hitting_config["dollar_rate"] = calc_dollar_values(hitters, lg, True)
-    pitchers, pitching_config["dollar_rate"] = calc_dollar_values(pitchers, lg, False)
-
-    config = {}
-    config["hitting"] = hitting_config
-    config["pitching"] = pitching_config
-
-    return config
-
+    return calc_from_df(lg, hitters, pitchers)
 
 def build_values(df, lg, is_batting):
     settled = False
@@ -373,7 +335,6 @@ def load_stats(system, year, lg, is_batting):
         df = load_names(df)
     
     df["Name"] = df["name_first"] + " " + df["name_last"]
-    df = load_games_by_pos(df, lg, str(year - 1), is_batting)
 
     return df
 
