@@ -46,8 +46,19 @@ def main():
     # Save the results
     #save_values(system, year, df)
 
+def calc_from_df(lg, hitters, pitchers):
+    
+    # Build values
+    hitters = build_values(hitters, lg, True)
+    pitchers = build_values(pitchers, lg, False)
 
-def calc(lg, year, system):
+    # Convert to dollar values
+    hitters = calc_dollar_values(hitters, lg, True)
+    pitchers = calc_dollar_values(pitchers, lg, False)
+
+    return pd.concat([hitters, pitchers])
+
+def calc_from_standard(lg, year, system):
 
     # Load file
     hitters = load_stats(system, year, lg, True)
@@ -64,7 +75,23 @@ def calc(lg, year, system):
     return pd.concat([hitters, pitchers])
 
 
-def calc_config(lg, year, system):
+def calc_config_from_df(lg, hitters, pitchers):
+
+    # Build values
+    hitters, hitting_config = build_values(hitters, lg, True)
+    pitchers, pitching_config = build_values(pitchers, lg, False)
+
+    # Convert to dollar values
+    hitters, hitting_config["dollar_rate"] = calc_dollar_values(hitters, lg, True)
+    pitchers, pitching_config["dollar_rate"] = calc_dollar_values(pitchers, lg, False)
+
+    config = {}
+    config["hitting"] = hitting_config
+    config["pitching"] = pitching_config
+
+    return config
+
+def calc_config_from_standard(lg, year, system):
 
     # Load file
     hitters = load_stats(system, year, lg, True)
