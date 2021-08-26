@@ -47,6 +47,10 @@ def main():
     #save_values(system, year, df)
 
 def calc_from_df(lg, year, hitters, pitchers):
+
+    # Load extra info (id, name)
+    hitters = load_extra(hitters)
+    pitchers = load_extra(pitchers)
     
     # Add positions
     hitters = load_games_by_pos(hitters, lg, str(year - 1), True)
@@ -245,13 +249,13 @@ def adjust_by_pos(df, positions, teams):
 
         # Only look at players who are eligible at this position
         if position == "MI":
-            df_pos = df[(df["is_2B"] == True) | (df["is_SS"] == True)]
+            df_pos = df[df["pos"].str.contains("2B|SS")]
         elif position == "CI":
-            df_pos = df[(df["is_1B"] == True) | (df["is_3B"] == True)]
+            df_pos = df[df["pos"].str.contains("1B|3B")]
         elif position in ["Util", "P"]:
             df_pos = df
         else:
-            df_pos = df[df["is_" + position] == True]
+            df_pos = df[df["pos"].str.contains(position)]
 
         # And only look at players that we haven't counted for other positions
         df_pos = df_pos[df_pos["counted"] == False]
@@ -273,7 +277,7 @@ def adjust_by_pos(df, positions, teams):
         elif position == "Util":
             for u_pos in positions:
                 if u_pos not in ["CI", "MI", "Util"]:
-                    if (df_pos["is_" + u_pos] == True).any():
+                    if (df_pos["pos"].str.contains(u_pos)).any():
                         repl[u_pos] = repl["Util"]
 
     # For each position, adjust each player's total value by the
@@ -284,7 +288,7 @@ def adjust_by_pos(df, positions, teams):
             df["adj_total"] = df["total"] - repl[position]
 
         if position not in ["CI", "MI", "Util", "P"]:
-            df.loc[df["is_" + position] == True, "adj_total"] = (
+            df.loc[df["pos"].str.contains(position), "adj_total"] = (
                 df["total"] - repl[position]
             )
 
@@ -316,7 +320,7 @@ def calc_dollar_values(df, lg, is_batting):
 
 
 def remove_extra_cols(df, cats, m_cats):
-    return df[["Name"] + cats + m_cats + ["total", "adj_total"]]
+    return df[["mlbam_id", "name", "pos"] + cats + m_cats + ["total", "adj_total"]]
 
 
 def load_stats(system, year, lg, is_batting):
@@ -328,13 +332,15 @@ def load_stats(system, year, lg, is_batting):
 
     df = pd.read_csv(filepath)
 
+    return df
+
+def load_extra(df):
+
     if "mlbam_id" not in df.columns:
         df = load_mlbam_id(df)
     
-    if not df.columns.isin(["Name","name_first","name_last"]).any():
+    if not df.columns.isin(["name","name_first","name_last"]).any():
         df = load_names(df)
-    
-    df["Name"] = df["name_first"] + " " + df["name_last"]
 
     return df
 
@@ -367,30 +373,40 @@ def load_names(df):
 
     df = df.join(register, how="left")
 
-    df["Name"] = df["name_first"] + " " + df["name_last"]
-    df.loc[df["name_suffix"].notna(), "Name"] = df["Name"] + " " + df["name_suffix"]
+    df["name"] = df["name_first"] + " " + df["name_last"]
+    df.loc[df["name_suffix"].notna(), "name"] = df["name"] + " " + df["name_suffix"]
 
     return df
 
 def load_games_by_pos(df, lg, year, is_batting):
+    
     gbp = pd.read_csv(
         Path(__file__).parent / "games_by_pos" / (year + ".csv"), index_col="mlbam_id"
     )
     gbp = gbp.add_prefix("G_")
 
+    gbp["gbp_pos"] = ""
     # Create boolean columns for positional eligibility
     if is_batting:
         for hit_pos in lg.hitting_positions:
             if "G_" + hit_pos in gbp.columns:
-                gbp["is_" + hit_pos] = gbp["G_" + hit_pos] > lg.hitting_eligibility
+                gbp.loc[gbp["G_" + hit_pos] > lg.hitting_eligibility, "gbp_pos"] += hit_pos + "-" 
     else:
         if "G_SP" in gbp.columns:
-            gbp["is_SP"] = gbp["G_SP"] > lg.sp_eligibility
+            gbp.loc[gbp["G_SP"] > lg.sp_eligibility, "gbp_pos"] += "SP-"
         if "G_RP" in gbp.columns:
-            gbp["is_RP"] = gbp["G_RP"] > lg.rp_eligibility
+            gbp.loc[gbp["G_RP"] > lg.rp_eligibility, "gbp_pos"] += "RP-"
+    gbp["gbp_pos"] = gbp["gbp_pos"].str.rstrip("-")
 
     df = df.merge(gbp, how="left", on="mlbam_id")
+    df["gbp_pos"] = df["gbp_pos"].fillna("")
+    df["pos"] = df["pos"].fillna("")
 
+    if "pos" not in df.columns:
+        df["pos"] = ""
+    
+    df.loc[df["gbp_pos"] != "", "pos"] = df["gbp_pos"]
+    
     return df
 
 
