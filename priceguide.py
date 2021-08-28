@@ -118,10 +118,6 @@ def build_values(df, lg, is_batting):
     config["means"] = means
     config["avg_rates"] = avg_rates
     config["repl"] = repl
-    print(sds)
-    print(means)
-    print(avg_rates)
-    print(repl)
 
     # Clear out excess columns
     df = remove_extra_cols(df, cats, m_cats)
@@ -314,7 +310,6 @@ def calc_dollar_values(df, lg, is_batting):
 
     df["$"] = (df["adj_total"] / total_points) * money + 1
     dollar_rate = 1 / total_points * money
-    print(dollar_rate)
 
     return df, dollar_rate
 
