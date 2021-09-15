@@ -48,6 +48,8 @@ def main():
 
 def calc_from_df(lg, year, hitters, pitchers):
 
+    lg = clean_request(lg)
+
     # Load extra info (id, name)
     hitters = load_extra(hitters)
     pitchers = load_extra(pitchers)
@@ -128,6 +130,32 @@ def build_values(df, lg, is_batting):
     df = cleanup_cols(df, cats, m_cats)
 
     return df, config
+
+def clean_request(lg):
+
+    # Remove any positions with a value of 0
+    lg.hitting_positions = {k: v for k, v in lg.hitting_positions.items() if v}
+    lg.pitching_positions = {k: v for k, v in lg.pitching_positions.items() if v}
+
+    if "K" in lg.hitting_categories:
+        lg.hitting_categories[lg.hitting_categories.index("K")] = "SO"
+
+    if "DB" in lg.hitting_categories:
+        lg.hitting_categories[lg.hitting_categories.index("DB")] = "2B"
+
+    if "TP" in lg.hitting_categories:
+        lg.hitting_categories[lg.hitting_categories.index("TP")] = "3B"
+
+    if "K" in lg.pitching_categories:
+        lg.pitching_categories[lg.pitching_categories.index("K")] = "SO"
+
+    if "S" in lg.pitching_categories:
+        lg.pitching_categories[lg.pitching_categories.index("S")] = "SV"
+
+    if "BAA" in lg.pitching_categories:
+        lg.pitching_categories[lg.pitching_categories.index("BAA")] = "AVG"
+
+    return lg
 
 
 def setup_stats(df, cats, num_players, is_batting):
