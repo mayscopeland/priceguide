@@ -68,7 +68,11 @@ def calc_from_df(lg, year, hitters, pitchers):
     config["hitting"] = hitting_config
     config["pitching"] = pitching_config
 
-    return pd.concat([hitters, pitchers]), config
+    df = pd.concat([hitters, pitchers])
+
+    df = format_final_columns(df, lg)
+
+    return df, config
 
 def calc_from_standard(lg, year, system):
 
@@ -120,7 +124,7 @@ def build_values(df, lg, is_batting):
     config["repl"] = repl
 
     # Clear out excess columns
-    df = remove_extra_cols(df, cats, m_cats)
+    df = cleanup_cols(df, cats, m_cats)
 
     return df, config
 
@@ -314,8 +318,62 @@ def calc_dollar_values(df, lg, is_batting):
     return df, dollar_rate
 
 
-def remove_extra_cols(df, cats, m_cats):
+def cleanup_cols(df, cats, m_cats):
+
+    if "ERA" in cats:
+        df["ERA"] = df["ER"] / df["IP"] * 9
+    
+    if "WHIP" in cats:
+        df["WHIP"] = (df["H"] + df["BB"]) / df["IP"]
+
+    if "AVG" in cats:
+        df["AVG"] = df["H"] / df["AB"]
+
     return df[["mlbam_id", "name", "pos"] + cats + m_cats + ["total", "adj_total"]]
+
+def format_final_columns(df, lg):
+    df.sort_values(by="$", ascending=False, inplace=True)
+
+    # Round columns as needed
+    for cat in lg.hitting_categories:
+        if cat == "AVG":
+            df["AVG"] = df["AVG"].round(3)
+        else:
+            df[cat] = df[cat].astype("Int64")
+
+        df["m" + cat] = df["m" + cat].round(1)
+    
+    for cat in lg.pitching_categories:
+        if cat in ["ERA","WHIP","K/9","BB/9","K/BB"]:
+            df[cat] = df[cat].round(2)
+        elif cat == "AVG":
+            df[cat] = df[cat].round(3)
+        else:
+            df[cat] = df[cat].astype("Int64")
+
+        df["m" + cat] = df["m" + cat].round(1)
+    
+    df["mlbam_id"] = df["mlbam_id"].astype(int)
+    df["total"] = df["total"].round(1)
+    df["adj_total"] = df["adj_total"].round(1)
+    df["$"] = df["$"].round(2)
+
+    # Arrange columns a bit
+    cols = ["mlbam_id","name","pos","$"]
+    for cat in lg.hitting_categories:
+        cols.append(cat)
+    for cat in lg.pitching_categories:
+        cols.append(cat)
+    for cat in lg.hitting_categories:
+        cols.append("m" + cat)
+    for cat in lg.pitching_categories:
+        cols.append("m" + cat)
+    cols.append("total")
+    cols.append("adj_total")
+
+    df = df[cols]
+
+    return df
 
 
 def load_stats(system, year, lg, is_batting):
@@ -333,9 +391,12 @@ def load_extra(df):
 
     if "mlbam_id" not in df.columns:
         df = load_mlbam_id(df)
-    
-    if not df.columns.isin(["name","name_first","name_last"]).any():
-        df = load_names(df)
+
+    if "name" not in df.columns:
+        if "name_last" in df.columns and "name_first" in df.columns:
+            df["name"] = df["name_first"] + " " + df["name_last"]
+        else:
+            df = load_names(df)
 
     return df
 
@@ -366,10 +427,10 @@ def load_names(df):
         low_memory=False,
     )
 
-    df = df.join(register, how="left")
+    df = df.merge(register.add_suffix("_reg"), how="left", left_on="mlbam_id", right_on="key_mlbam_reg")
 
-    df["name"] = df["name_first"] + " " + df["name_last"]
-    df.loc[df["name_suffix"].notna(), "name"] = df["name"] + " " + df["name_suffix"]
+    df["name"] = df["name_first_reg"] + " " + df["name_last_reg"]
+    df.loc[df["name_suffix_reg"].notna(), "name"] = df["name"] + " " + df["name_suffix_reg"]
 
     return df
 
