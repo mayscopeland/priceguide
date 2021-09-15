@@ -102,6 +102,7 @@ def build_values(df, lg, is_batting):
     while not settled:
         df, avg_rates = setup_stats(df, cats, num_players, is_batting)
         df, sds, means = calc_z_scores(df, cats, num_players)
+        df = flip_negative_cats(df, cats, is_batting)
 
         df["total"] = df[m_cats].sum(axis=1)
         df.sort_values(by="total", inplace=True, ascending=False)
@@ -134,7 +135,6 @@ def setup_stats(df, cats, num_players, is_batting):
     df = add_missing_cols(df, is_batting)
     df = calc_stats(df, cats)
     df, avg_rates = calc_rate_stats(df, cats, num_players)
-    df = flip_neg_cats(df, cats, is_batting)
 
     return df, avg_rates
 
@@ -156,10 +156,15 @@ def calc_stats(df, cats):
         df["TB"] = df["H"] + df["2B"] + (df["3B"] * 2) + (df["HR"] * 3)
     if "xBH" in cats:
         df["xBH"] = df["2B"] + df["3B"] + df["HR"]
-    if "R+RBI" in cats:
-        df["R+RBI"] = df["R"] + df["RBI"]
+    if "RBI+R" in cats:
+        df["RBI+R"] = df["RBI"] + df["R"]
     if "SB-CS" in cats:
-        df["SB-CS"] - df["SB"] - df["CS"]
+        df["SB-CS"] = df["SB"] - df["CS"]
+    if "SV+HLD" in cats:
+        df["SV+HLD"] = df["SV"] + df["HLD"]
+
+    if "AVG" in cats and "AB" not in df.columns:
+        df["AB"] = df["BFP"] - df["BB"] - df["HBP"]
 
     return df
 
@@ -176,7 +181,7 @@ def calc_rate_stats(df, cats, num_players):
         num = ["H", "BB", "HBP"]
         den = ["AB", "BB", "HBP", "SF"]
         df["OBP"] = calc_rate_stat(df, num, den, avg_player)
-        avg_rates["AVG"] = (avg_player["H"] + avg_player["BB"] + avg_player["HBP"]) / (avg_player["AB"] + avg_player["BB"] + avg_player["HBP"] + avg_player["SF"])
+        avg_rates["OBP"] = (avg_player["H"] + avg_player["BB"] + avg_player["HBP"]) / (avg_player["AB"] + avg_player["BB"] + avg_player["HBP"] + avg_player["SF"])
 
     if "SLG" in cats:
         df["SLG"] = calc_rate_stat(df, ["TB"], ["AB"], avg_player)
@@ -209,20 +214,6 @@ def calc_rate_stat(df, num, den, avg):
     return df[num].sum(axis=1) - (df[den].sum(axis=1) * avg[num].sum() / avg[den].sum())
 
 
-def flip_neg_cats(df, cats, is_batting):
-    neg_cats = ["ERA", "WHIP", "BB/9"]
-
-    for cat in neg_cats:
-        if cat in cats:
-            df[cat] = df[cat] * -1
-
-    # Strikeouts are negative for batters but not pitchers
-    if is_batting and "SO" in cats:
-        df["SO"] = df["SO"] * -1
-
-    return df
-
-
 def calc_z_scores(df, cats, num_players):
 
     sds = {}
@@ -236,6 +227,20 @@ def calc_z_scores(df, cats, num_players):
         means[cat] = mean
 
     return df, sds, means
+
+
+def flip_negative_cats(df, cats, is_batting):
+    
+    if is_batting:
+        negative_cats = ["SO"]
+    else:
+        negative_cats = ["ERA","WHIP","AVG","BB/9","HR"]
+    
+    for cat in cats:
+        if cat in negative_cats:
+            df["m" + cat] *= -1
+
+    return df
 
 
 def adjust_by_pos(df, positions, teams):
@@ -320,14 +325,29 @@ def calc_dollar_values(df, lg, is_batting):
 
 def cleanup_cols(df, cats, m_cats):
 
+    if "AVG" in cats:
+        df["AVG"] = df["H"] / df["AB"]
+
+    if "OBP" in cats:
+        df["OBP"] = (df["H"] + df["BB"] + df["HBP"]) / (df["AB"] + df["BB"] + df["HBP"] + df["SF"])
+
+    if "SLG" in cats:
+        df["SLG"] = df["TB"] / df["AB"]
+
     if "ERA" in cats:
         df["ERA"] = df["ER"] / df["IP"] * 9
     
     if "WHIP" in cats:
         df["WHIP"] = (df["H"] + df["BB"]) / df["IP"]
 
-    if "AVG" in cats:
-        df["AVG"] = df["H"] / df["AB"]
+    if "K/9" in cats:
+        df["K/9"] = df["SO"] / df["IP"] * 9
+
+    if "BB/9" in cats:
+        df["BB/9"] = df["BB"] / df["IP"] * 9
+
+    if "K/BB" in cats:
+        df["K/BB"] = df["SO"] / df["BB"]
 
     return df[["mlbam_id", "name", "pos"] + cats + m_cats + ["total", "adj_total"]]
 
@@ -336,8 +356,8 @@ def format_final_columns(df, lg):
 
     # Round columns as needed
     for cat in lg.hitting_categories:
-        if cat == "AVG":
-            df["AVG"] = df["AVG"].round(3)
+        if cat in ["AVG","OBP","SLG"]:
+            df[cat] = df[cat].round(3)
         else:
             df[cat] = df[cat].astype("Int64")
 
