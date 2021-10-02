@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from pathlib import Path
 
 class League:
@@ -33,20 +34,7 @@ class League:
         return sum(self.pitching_positions.values()) * self.teams
 
 
-def main():
-
-    lg = League()
-    year = 2021
-    system = "OP"
-
-    print(calc_from_standard(lg, year, system))
-
-    #df = calc(lg, year, system)
-
-    # Save the results
-    #save_values(system, year, df)
-
-def calc_from_df(lg, year, hitters, pitchers):
+def calculate(lg, year, hitters, pitchers):
 
     lg = clean_request(lg)
 
@@ -76,13 +64,57 @@ def calc_from_df(lg, year, hitters, pitchers):
 
     return df, config
 
-def calc_from_standard(lg, year, system):
+def quick_calc(config, df, is_batting):
 
-    # Load file
-    hitters = load_stats(system, year, lg, True)
-    pitchers = load_stats(system, year, lg, False)
+    if is_batting:
+        lg_stats = config["hitting"]
+    else:
+        lg_stats = config["pitching"]
 
-    return calc_from_df(lg, hitters, pitchers)
+    # Calculate and combine z-scores
+    for cat in lg_stats["sds"]:
+        if cat in lg_stats["avg_rates"]:
+            if cat == "AVG":
+                df["mAVG"] = (df["H"] - (df["AB"] * lg_stats["avg_rates"]["AVG"])) / lg_stats["sds"]["AVG"]
+            elif cat == "OBP":
+                df["mOBP"] = ((df["H"] + df["BB"] + df["HBP"]) - (df["AB"] + df["BB"] + df["HBP"] + df["SF"]) * lg_stats["avg_rates"]["OBP"]) / lg_stats["sds"]["OBP"]
+            elif cat == "SLG":
+                df["mSLG"] = ((df["H"] + df["2B"] + df["3B"]*2 + df["HR"]*3) - (df["AB"] * lg_stats["avg_rates"]["SLG"])) / lg_stats["sds"]["SLG"]
+            elif cat == "ERA":
+                df["mERA"] = (df["ER"] - (df["IP"] * lg_stats["avg_rates"]["ERA"])) / lg_stats["sds"]["ERA"]
+            elif cat == "WHIP":
+                df["mWHIP"] = ((df["H"] + df["BB"]) - (df["IP"] * lg_stats["avg_rates"]["WHIP"])) / lg_stats["sds"]["WHIP"]
+            elif cat == "K/9":
+                df["mK/9"] = (df["SO"] - (df["IP"] * lg_stats["avg_rates"]["K/9"])) / lg_stats["sds"]["K/9"]
+            elif cat == "BB/9":
+                df["mBB/9"] = (df["BB"] - (df["IP"] * lg_stats["avg_rates"]["BB/9"])) / lg_stats["sds"]["BB/9"]
+            elif cat == "K/BB":
+                df["mK/BB"] = (df["SO"] - (df["BB"] * lg_stats["avg_rates"]["K/BB"])) / lg_stats["sds"]["K/BB"]
+        else:
+            df["m" + cat] = (df[cat] - lg_stats["means"][cat]) / lg_stats["sds"][cat]
+    
+    flip_negative_cats(df, lg_stats["sds"].keys(), is_batting)
+
+    df["total"] = 0
+    for cat in lg_stats["sds"]:
+        df["total"] += df["m" + cat]
+
+    # Adjust for position
+    df["pos"].replace("DH", "Util", inplace=True)
+    df["pos"].replace(["LF","CF","RF"], "OF", inplace=True)
+
+    # We'll count a player as SP if he starts at least half of his games
+    if not is_batting:
+        df["pos"] = np.where((df.GS >= (df.G / 2)), "SP", "RP")
+
+    df["repl"] = df["pos"].map(lg_stats["repl"])
+    df["adj_total"] = df["total"] - df["repl"]
+
+    # Convert to dollar value
+    df["$"] = df["adj_total"] * lg_stats["dollar_rate"] + 1
+
+    return df
+
 
 def build_values(df, lg, is_batting):
     settled = False
@@ -516,7 +548,3 @@ def load_games_by_pos(df, lg, year, is_batting):
 
 def save_values(system, year, df):
     df.to_csv(Path(__file__).parent / "output" / (str(year) + system + "Values.csv"), index=False)
-
-
-if __name__ == "__main__":
-    main()
