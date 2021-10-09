@@ -4,9 +4,7 @@ import requests
 import os
 
 def main():
-    build_all(2015)
-    build_all(2016)
-    build_all(2017)
+    build_all(2021)
 
 def build_all(year):
 

@@ -21,7 +21,7 @@ class League:
             "Util": 1,
         }
         self.pitching_positions = {"SP": 6, "RP": 3}
-        self.hitting_eligibility = 8
+        self.hitting_eligibility = 20
         self.sp_eligibility = 5
         self.rp_eligibility = 5
 
