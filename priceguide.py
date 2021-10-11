@@ -307,7 +307,7 @@ def adjust_by_pos(df, positions, teams):
 
     repl = {position: 100 for position in positions}
     df["counted"] = False
-    df["adj_total"] = 0
+    df["adj_total"] = -100
 
     for position in positions:
         pos_count = positions[position] * teams
@@ -356,9 +356,6 @@ def adjust_by_pos(df, positions, teams):
             df.loc[df["pos"].str.contains(position), "adj_total"] = (
                 df["total"] - repl[position]
             )
-    
-    # If no positions matched, then assign the lowest replacment level
-    df.loc[df["adj_total"] == 0, "adj_total"] = df["total"] - min(list(repl.values()))
 
     return df, repl
 
