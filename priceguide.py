@@ -3,12 +3,36 @@ import numpy as np
 from pathlib import Path
 
 class League:
-    def __init__(self):
+    SCORING_ROTO = "R"
+    SCORING_POINTS = "P"
+
+    LEAGUE_STANDARD_4x4 = "4x4"
+    LEAGUE_STANDARD_5x5 = "5x5"
+    LEAGUE_YAHOO = "Yahoo"
+    LEAGUE_CBS_ROTO = "CBS Roto"
+    LEAGUE_CBS_POINTS = "CBS Points"
+    LEAGUE_ESPN_ROTO = "ESPN Roto"
+    LEAGUE_ESPN_POINTS = "ESPN Points"
+    LEAGUE_NFBC_MAIN_EVENT = "NFBC Main Event"
+    LEAGUE_NFBC_CUTLINE = "NFBC Cutline"
+    LEAGUE_NFBC_BB10 = "NFBC BB10"
+    LEAGUE_OTTONEU_5x5 = "Ottoneu 5x5"
+    LEAGUE_OTTONEU_4x4 = "Ottoneu 4x4"
+    LEAGUE_OTTONEU_FG_POINTS = "Ottoneu FG Points"
+    LEAGUE_OTTONEU_SABR_POINTS = "Ottoneu SABR Points"
+    LEAGUE_FANTRAX_BEST_BALL = "Fantrax Best Ball"
+
+    def __init__(self, league_type=LEAGUE_STANDARD_5x5):
+
+        # The defaults are for the "standard" 5x5 game (as on CBS)
+        # Every other configuration uses this as the base
         self.teams = 12
         self.budget = 260
         self.hitting_split = 0.7
+        self.scoring_type = self.SCORING_ROTO
         self.hitting_categories = ["HR", "SB", "R", "RBI", "AVG"]
         self.pitching_categories = ["W", "SV", "SO", "ERA", "WHIP"]
+
         self.hitting_positions = {
             "C": 2,
             "SS": 1,
@@ -24,6 +48,135 @@ class League:
         self.hitting_eligibility = 20
         self.sp_eligibility = 5
         self.rp_eligibility = 5
+
+        # 4x4
+        if league_type == self.LEAGUE_STANDARD_4x4:
+            self.hitting_categories = ["HR", "SB", "RBI", "AVG"]
+            self.pitching_categories = ["W", "SV", "ERA", "WHIP"]
+
+        # YAHOO
+        if league_type == self.LEAGUE_YAHOO:
+            self.hitting_eligibility = 5
+            self.hitting_positions = {
+                "C": 1,
+                "SS": 1,
+                "2B": 1,
+                "3B": 1,
+                "OF": 3,
+                "1B": 1,
+                "Util": 2,
+            }
+            self.pitching_positions = {"SP": 2, "RP": 2, "P": 4}
+
+        # CBS POINTS
+        if league_type == self.LEAGUE_CBS_POINTS:
+            self.hitting_positions = {
+                "C": 1,
+                "SS": 1,
+                "2B": 1,
+                "3B": 1,
+                "OF": 3,
+                "1B": 1,
+                "Util": 1,
+            }
+            self.pitching_positions = {"SP": 5, "RP": 2}
+            self.scoring_type = self.SCORING_POINTS
+            self.hitting_points = {"R": 1, "RBI": 1, "TB": 1, "BB": 1, "HBP": 1, "SO": -0.5, "SB": 2, "CS": -1}
+            self.pitching_points = {"IP": 3, "H": -1, "ER": -1, "BB": -1, "HBP": -1, "SO": 0.5, "W": 7, "QS": 3, "L": -5, "SV": 7}
+
+
+        # ESPN
+        if league_type in [self.LEAGUE_ESPN_ROTO, self.LEAGUE_ESPN_POINTS]:
+            self.teams = 10
+            self.hitting_positions = {
+            "C": 1,
+            "SS": 1,
+            "2B": 1,
+            "3B": 1,
+            "OF": 5,
+            "1B": 1,
+            "MI": 1,
+            "CI": 1,
+            "Util": 1,
+            }
+
+        if league_type == self.LEAGUE_ESPN_POINTS:
+            self.scoring_type = self.SCORING_POINTS
+            self.hitting_points = {"R": 1, "RBI": 1, "TB": 1, "BB": 1, "SO": -1, "SB": 1}
+            self.pitching_points = {"IP": 3, "H": -1, "ER": -2, "BB": -1, "SO": 1, "W": 5, "L": -5, "SV": 5}
+            self.pitching_positions = {"P": 9}
+        
+        # NFBC
+        if league_type == self.LEAGUE_NFBC_MAIN_EVENT:
+            self.teams = 15
+
+        if league_type == self.LEAGUE_NFBC_CUTLINE:
+            self.teams = 10
+            self.scoring_type = self.SCORING_POINTS
+            self.hitting_points = {"AB": -1, "H": 4, "R": 2, "HR": 6, "RBI": 2, "SB": 5}
+            self.pitching_points = {"IP": 3, "H": -1, "ER": -2, "BB": -1, "SO": 1, "W": 6, "SV": 8}
+            self.pitching_positions = {"P": 9}
+
+        if league_type == self.LEAGUE_NFBC_BB10:
+            self.scoring_type = self.SCORING_POINTS
+            self.hitting_points = {"AB": -1, "H": 4, "R": 2, "HR": 6, "RBI": 2, "SB": 5}
+            self.pitching_points = {"IP": 3, "H": -1, "ER": -2, "BB": -1, "SO": 1, "W": 6, "SV": 8}
+            self.hitting_positions = {
+            "C": 1,
+            "SS": 1,
+            "2B": 1,
+            "3B": 1,
+            "OF": 2,
+            "1B": 1,
+            "Util": 1,
+            }
+            self.pitching_positions = {"P": 4}
+
+        # OTTONEU
+        if league_type in [self.LEAGUE_OTTONEU_5x5, self.LEAGUE_OTTONEU_4x4, self.LEAGUE_OTTONEU_FG_POINTS, self.LEAGUE_OTTONEU_SABR_POINTS]:
+            self.budget = 400
+            self.hitting_eligibility = 10
+            self.hitting_positions = {
+                "C": 1,
+                "SS": 1,
+                "2B": 1,
+                "3B": 1,
+                "OF": 5,
+                "1B": 1,
+                "MI": 1,
+                "Util": 1,
+            }
+            self.pitching_positions = {"SP": 5, "RP": 5}
+
+        if league_type == self.LEAGUE_OTTONEU_4x4:
+            self.hitting_categories = ["OBP", "SLG", "HR", "R"]
+            self.pitching_categories = ["ERA", "WHIP", "HR/9", "SO"]
+
+        if league_type == self.LEAGUE_OTTONEU_FG_POINTS:
+            self.scoring_type = self.SCORING_POINTS
+            self.hitting_points = {"AB": -1.0, "H": 5.6, "2B": 2.9, "3B": 5.7, "HR": 9.4, "BB": 3.0, "HBP": 3.0, "SB": 1.9, "CS": -2.8}
+            self.pitching_points = {"IP": 7.4, "SO": 2.0, "H": -2.6, "BB": -3.0, "HBP": -3.0, "HR": -12.3, "SV": 5.0, "HLD": 4.0}
+
+        if league_type == self.LEAGUE_OTTONEU_SABR_POINTS:
+            self.scoring_type = self.SCORING_POINTS
+            self.hitting_points = {"AB": -1.0, "H": 5.6, "2B": 2.9, "3B": 5.7, "HR": 9.4, "BB": 3.0, "HBP": 3.0, "SB": 1.9, "CS": -2.8}
+            self.pitching_points = {"IP": 5.0, "SO": 2.0, "BB": -3.0, "HBP": -3.0, "HR": -13.0, "SV": 5.0, "HLD": 4.0}
+        
+        # FANTRAX
+        if league_type == self.LEAGUE_FANTRAX_BEST_BALL:
+            self.scoring_type = self.SCORING_POINTS
+            self.hitting_points = {"H": 1, "HR": 3, "RBI": 1, "R": 1, "SB": 3, "BB": 1}
+            self.pitching_points = {"ER": -1.5, "IP": 1.5, "QS": 3, "SV": 6, "SO": 1.5, "W": 3, "H": -0.5, "BB": -0.5}
+            self.hitting_positions = {
+                "C": 1,
+                "SS": 1,
+                "2B": 1,
+                "3B": 1,
+                "OF": 5,
+                "1B": 1,
+                "Util": 3,
+            }
+            self.pitching_positions = {"P": 9}
 
     @property
     def num_hitters(self):
@@ -90,6 +243,8 @@ def quick_calc(config, df, is_batting):
                 df["mBB/9"] = (df["BB"] - (df["IP"] * lg_stats["avg_rates"]["BB/9"])) / lg_stats["sds"]["BB/9"]
             elif cat == "K/BB":
                 df["mK/BB"] = (df["SO"] - (df["BB"] * lg_stats["avg_rates"]["K/BB"])) / lg_stats["sds"]["K/BB"]
+            elif cat == "HR/9":
+                df["mHR/9"] = (df["HR"] - (df["IP"] * lg_stats["avg_rates"]["HR/9"])) / lg_stats["sds"]["HR/9"]
         else:
             df["m" + cat] = (df[cat] - lg_stats["means"][cat]) / lg_stats["sds"][cat]
     
@@ -123,43 +278,64 @@ def build_values(df, lg, is_batting):
     previous_rep_levels = []
 
     if is_batting:
-        cats = lg.hitting_categories
+        if lg.scoring_type == lg.SCORING_ROTO:
+            cats = lg.hitting_categories
+        else:
+            pts = lg.hitting_points
         pos = lg.hitting_positions
         num_players = lg.num_hitters
     else:
-        cats = lg.pitching_categories
+        if lg.scoring_type == lg.SCORING_ROTO:
+            cats = lg.pitching_categories
+        else:
+            pts = lg.pitching_points
         pos = lg.pitching_positions
         num_players = lg.num_pitchers
 
-    m_cats = ["m" + cat for cat in cats]
+    if lg.scoring_type == lg.SCORING_ROTO:
+        m_cats = ["m" + cat for cat in cats]
 
-    while not settled:
-        df, avg_rates = setup_stats(df, cats, num_players, is_batting)
-        df, sds, means = calc_z_scores(df, cats, num_players)
-        df = flip_negative_cats(df, cats, is_batting)
+        while not settled:
+            df, avg_rates = setup_stats(df, cats, num_players, is_batting)
+            df, sds, means = calc_z_scores(df, cats, num_players)
+            df = flip_negative_cats(df, cats, is_batting)
 
-        df["total"] = df[m_cats].sum(axis=1)
+            df["total"] = df[m_cats].sum(axis=1)
+
+            df.sort_values(by="total", inplace=True, ascending=False)
+
+            df, repl = adjust_by_pos(df, pos, lg.teams)
+            df.sort_values(by="adj_total", inplace=True, ascending=False)
+
+            # Check if optimal grouping
+            if sds in previous_sds:
+                settled = True
+
+            previous_sds.append(sds)
+            previous_means.append(means)
+            previous_rep_levels.append(repl)
+
+        config = {}
+        config["sds"] = sds
+        config["means"] = means
+        config["avg_rates"] = avg_rates
+        config["repl"] = repl
+
+        # Clear out excess columns
+        df = cleanup_cols(df, cats, m_cats)
+    else:
+        df = add_missing_cols(df, is_batting)
+        df = calc_stats(df, pts)
+        df["total"] = 0
+        for cat, value in pts.items():
+            df["total"] += df[cat] * value
+
         df.sort_values(by="total", inplace=True, ascending=False)
 
         df, repl = adjust_by_pos(df, pos, lg.teams)
         df.sort_values(by="adj_total", inplace=True, ascending=False)
-
-        # Check if optimal grouping
-        if sds in previous_sds:
-            settled = True
-
-        previous_sds.append(sds)
-        previous_means.append(means)
-        previous_rep_levels.append(repl)
-
-    config = {}
-    config["sds"] = sds
-    config["means"] = means
-    config["avg_rates"] = avg_rates
-    config["repl"] = repl
-
-    # Clear out excess columns
-    df = cleanup_cols(df, cats, m_cats)
+        config = {}
+        config["repl"] = repl
 
     return df, config
 
@@ -267,6 +443,10 @@ def calc_rate_stats(df, cats, num_players):
         df["K/BB"] = calc_rate_stat(df, ["SO"], ["BB"], avg_player)
         avg_rates["K/BB"] = avg_player["SO"] / avg_player["BB"]
 
+    if "HR/9" in cats:
+        df["HR/9"] = calc_rate_stat(df, ["HR"], ["IP"], avg_player)
+        avg_rates["HR/9"] = avg_player["HR"] / avg_player["IP"]
+
     return df, avg_rates
 
 
@@ -294,7 +474,7 @@ def flip_negative_cats(df, cats, is_batting):
     if is_batting:
         negative_cats = ["SO"]
     else:
-        negative_cats = ["ERA","WHIP","AVG","BB/9","HR"]
+        negative_cats = ["ERA","WHIP","AVG","BB/9","HR/9","HR"]
     
     for cat in cats:
         if cat in negative_cats:
@@ -409,29 +589,39 @@ def cleanup_cols(df, cats, m_cats):
     if "K/BB" in cats:
         df["K/BB"] = df["SO"] / df["BB"]
 
+    if "HR/9" in cats:
+        df["HR/9"] = df["HR"] / df["IP"] * 9
+
     return df[["mlbam_id", "name", "pos"] + cats + m_cats + ["total", "adj_total"]]
 
 def format_final_columns(df, lg):
     df.sort_values(by="$", ascending=False, inplace=True)
 
     # Round columns as needed
-    for cat in lg.hitting_categories:
-        if cat in ["AVG","OBP","SLG"]:
-            df[cat] = df[cat].round(3)
-        else:
-            df[cat] = df[cat].astype("Int64")
+    if lg.scoring_type == League.SCORING_ROTO:
 
-        df["m" + cat] = df["m" + cat].round(1)
-    
-    for cat in lg.pitching_categories:
-        if cat in ["ERA","WHIP","K/9","BB/9","K/BB"]:
-            df[cat] = df[cat].round(2)
-        elif cat == "AVG":
-            df[cat] = df[cat].round(3)
-        else:
-            df[cat] = df[cat].astype("Int64")
+        for cat in lg.hitting_categories:
+            if cat in ["AVG","OBP","SLG"]:
+                df[cat] = df[cat].round(3)
+            else:
+                df[cat] = df[cat].astype("Int64")
 
-        df["m" + cat] = df["m" + cat].round(1)
+            df["m" + cat] = df["m" + cat].round(1)
+        
+        for cat in lg.pitching_categories:
+            if cat in ["ERA","WHIP","K/9","BB/9","K/BB"]:
+                df[cat] = df[cat].round(2)
+            elif cat == "AVG":
+                df[cat] = df[cat].round(3)
+            else:
+                df[cat] = df[cat].astype("Int64")
+
+            df["m" + cat] = df["m" + cat].round(1)
+    else:
+        for pts in lg.hitting_points:
+            df[pts] = df[pts].astype("Int64")
+        for pts in lg.pitching_points:
+            df[pts] = df[pts].astype("Int64")
     
     df["mlbam_id"] = df["mlbam_id"].astype(int)
     df["total"] = df["total"].round(1)
@@ -440,14 +630,15 @@ def format_final_columns(df, lg):
 
     # Arrange columns a bit
     cols = ["mlbam_id","name","pos","$"]
-    for cat in lg.hitting_categories:
-        cols.append(cat)
-    for cat in lg.pitching_categories:
-        cols.append(cat)
-    for cat in lg.hitting_categories:
-        cols.append("m" + cat)
-    for cat in lg.pitching_categories:
-        cols.append("m" + cat)
+    if lg.scoring_type == League.SCORING_ROTO:
+        for cat in lg.hitting_categories:
+            cols.append(cat)
+        for cat in lg.pitching_categories:
+            cols.append(cat)
+        for cat in lg.hitting_categories:
+            cols.append("m" + cat)
+        for cat in lg.pitching_categories:
+            cols.append("m" + cat)
     cols.append("total")
     cols.append("adj_total")
 
