@@ -224,35 +224,46 @@ def quick_calc(config, df, is_batting):
     else:
         lg_stats = config["pitching"]
 
-    # Calculate and combine z-scores
-    for cat in lg_stats["sds"]:
-        if cat in lg_stats["avg_rates"]:
-            if cat == "AVG":
-                df["mAVG"] = (df["H"] - (df["AB"] * lg_stats["avg_rates"]["AVG"])) / lg_stats["sds"]["AVG"]
-            elif cat == "OBP":
-                df["mOBP"] = ((df["H"] + df["BB"] + df["HBP"]) - (df["AB"] + df["BB"] + df["HBP"] + df["SF"]) * lg_stats["avg_rates"]["OBP"]) / lg_stats["sds"]["OBP"]
-            elif cat == "SLG":
-                df["mSLG"] = ((df["H"] + df["2B"] + df["3B"]*2 + df["HR"]*3) - (df["AB"] * lg_stats["avg_rates"]["SLG"])) / lg_stats["sds"]["SLG"]
-            elif cat == "ERA":
-                df["mERA"] = (df["ER"] - (df["IP"] * lg_stats["avg_rates"]["ERA"])) / lg_stats["sds"]["ERA"]
-            elif cat == "WHIP":
-                df["mWHIP"] = ((df["H"] + df["BB"]) - (df["IP"] * lg_stats["avg_rates"]["WHIP"])) / lg_stats["sds"]["WHIP"]
-            elif cat == "K/9":
-                df["mK/9"] = (df["SO"] - (df["IP"] * lg_stats["avg_rates"]["K/9"])) / lg_stats["sds"]["K/9"]
-            elif cat == "BB/9":
-                df["mBB/9"] = (df["BB"] - (df["IP"] * lg_stats["avg_rates"]["BB/9"])) / lg_stats["sds"]["BB/9"]
-            elif cat == "K/BB":
-                df["mK/BB"] = (df["SO"] - (df["BB"] * lg_stats["avg_rates"]["K/BB"])) / lg_stats["sds"]["K/BB"]
-            elif cat == "HR/9":
-                df["mHR/9"] = (df["HR"] - (df["IP"] * lg_stats["avg_rates"]["HR/9"])) / lg_stats["sds"]["HR/9"]
-        else:
-            df["m" + cat] = (df[cat] - lg_stats["means"][cat]) / lg_stats["sds"][cat]
-    
-    flip_negative_cats(df, lg_stats["sds"].keys(), is_batting)
+    # If we have SDs, then this is a roto league
+    if "cats" in lg_stats.keys():
+        
+        df = calc_stats(df, lg_stats["cats"])
+        # Calculate and combine z-scores
+        for cat in lg_stats["cats"]:
+            if cat in lg_stats["avg_rates"]:
+                if cat == "AVG":
+                    df["mAVG"] = (df["H"] - (df["AB"] * lg_stats["avg_rates"]["AVG"])) / lg_stats["sds"]["AVG"]
+                elif cat == "OBP":
+                    df["mOBP"] = ((df["H"] + df["BB"] + df["HBP"]) - (df["AB"] + df["BB"] + df["HBP"] + df["SF"]) * lg_stats["avg_rates"]["OBP"]) / lg_stats["sds"]["OBP"]
+                elif cat == "SLG":
+                    df["mSLG"] = ((df["H"] + df["2B"] + df["3B"]*2 + df["HR"]*3) - (df["AB"] * lg_stats["avg_rates"]["SLG"])) / lg_stats["sds"]["SLG"]
+                elif cat == "ERA":
+                    df["mERA"] = (df["ER"] - (df["IP"] * lg_stats["avg_rates"]["ERA"])) / lg_stats["sds"]["ERA"]
+                elif cat == "WHIP":
+                    df["mWHIP"] = ((df["H"] + df["BB"]) - (df["IP"] * lg_stats["avg_rates"]["WHIP"])) / lg_stats["sds"]["WHIP"]
+                elif cat == "K/9":
+                    df["mK/9"] = (df["SO"] - (df["IP"] * lg_stats["avg_rates"]["K/9"])) / lg_stats["sds"]["K/9"]
+                elif cat == "BB/9":
+                    df["mBB/9"] = (df["BB"] - (df["IP"] * lg_stats["avg_rates"]["BB/9"])) / lg_stats["sds"]["BB/9"]
+                elif cat == "K/BB":
+                    df["mK/BB"] = (df["SO"] - (df["BB"] * lg_stats["avg_rates"]["K/BB"])) / lg_stats["sds"]["K/BB"]
+                elif cat == "HR/9":
+                    df["mHR/9"] = (df["HR"] - (df["IP"] * lg_stats["avg_rates"]["HR/9"])) / lg_stats["sds"]["HR/9"]
+            else:
+                df["m" + cat] = (df[cat] - lg_stats["means"][cat]) / lg_stats["sds"][cat]
+        
+        flip_negative_cats(df, lg_stats["sds"].keys(), is_batting)
 
-    df["total"] = 0
-    for cat in lg_stats["sds"]:
-        df["total"] += df["m" + cat]
+        df["total"] = 0
+        for cat in lg_stats["cats"]:
+            df["total"] += df["m" + cat]
+    
+    # Points leagues
+    else:
+        df = calc_stats(df, lg_stats["pts"])
+        df["total"] = 0
+        for cat, value in lg_stats["pts"].items():
+            df["total"] += df[cat] * value
 
     # Adjust for position
     df["pos"].replace("DH", "Util", inplace=True)
@@ -260,7 +271,8 @@ def quick_calc(config, df, is_batting):
 
     # We'll count a player as SP if he starts at least half of his games
     if not is_batting:
-        df["pos"] = np.where((df.GS >= (df.G / 2)), "SP", "RP")
+        if "SP" in lg_stats["repl"]:
+            df["pos"] = np.where((df.GS >= (df.G / 2)), "SP", "RP")
 
     df["repl"] = df["pos"].map(lg_stats["repl"])
     df["adj_total"] = df["total"] - df["repl"]
@@ -316,6 +328,7 @@ def build_values(df, lg, is_batting):
             previous_rep_levels.append(repl)
 
         config = {}
+        config["cats"] = cats
         config["sds"] = sds
         config["means"] = means
         config["avg_rates"] = avg_rates
@@ -335,6 +348,7 @@ def build_values(df, lg, is_batting):
         df, repl = adjust_by_pos(df, pos, lg.teams)
         df.sort_values(by="adj_total", inplace=True, ascending=False)
         config = {}
+        config["pts"] = pts
         config["repl"] = repl
 
     return df, config
