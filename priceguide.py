@@ -641,6 +641,12 @@ def format_final_columns(df, lg):
             cols.append("m" + cat)
         for cat in lg.pitching_categories:
             cols.append("m" + cat)
+    else:
+        for cat in lg.hitting_points:
+            cols.append(cat)
+        for cat in lg.pitching_points:
+            cols.append(cat)
+
     cols.append("total")
     cols.append("adj_total")
 
