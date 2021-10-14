@@ -390,6 +390,8 @@ def add_missing_cols(df, is_batting):
 def calc_stats(df, cats):
     if "TB" in cats or "SLG" in cats:
         df["TB"] = df["H"] + df["2B"] + (df["3B"] * 2) + (df["HR"] * 3)
+    if "1B" in cats:
+        df["1B"] = df["H"] - df["2B"] - df["3B"] - df["HR"]
     if "xBH" in cats:
         df["xBH"] = df["2B"] + df["3B"] + df["HR"]
     if "RBI+R" in cats:
@@ -717,12 +719,12 @@ def load_games_by_pos(df, lg, year, is_batting):
     if is_batting:
         for hit_pos in lg.hitting_positions:
             if "G_" + hit_pos in gbp.columns:
-                gbp.loc[gbp["G_" + hit_pos] > lg.hitting_eligibility, "gbp_pos"] += hit_pos + "-" 
+                gbp.loc[gbp["G_" + hit_pos] >= lg.hitting_eligibility, "gbp_pos"] += hit_pos + "-" 
     else:
         if "G_SP" in gbp.columns:
-            gbp.loc[gbp["G_SP"] > lg.sp_eligibility, "gbp_pos"] += "SP-"
+            gbp.loc[gbp["G_SP"] >= lg.sp_eligibility, "gbp_pos"] += "SP-"
         if "G_RP" in gbp.columns:
-            gbp.loc[gbp["G_RP"] > lg.rp_eligibility, "gbp_pos"] += "RP-"
+            gbp.loc[gbp["G_RP"] >= lg.rp_eligibility, "gbp_pos"] += "RP-"
     gbp["gbp_pos"] = gbp["gbp_pos"].str.rstrip("-")
 
     df = df.merge(gbp, how="left", on="mlbam_id")
