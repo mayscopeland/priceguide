@@ -211,7 +211,7 @@ def calculate(lg, year, hitters, pitchers):
     config["hitting"] = hitting_config
     config["pitching"] = pitching_config
 
-    df = pd.concat([hitters, pitchers])
+    df = pd.merge(hitters, pitchers, how="outer", suffixes=("_H", "_P"), on=["mlbam_id", "name", "pos", "$", "total", "adj_total",])
 
     df = format_final_columns(df, lg)
 
@@ -227,7 +227,7 @@ def quick_calc(config, df, is_batting):
     # If we have SDs, then this is a roto league
     if "cats" in lg_stats.keys():
         
-        df = calc_stats(df, lg_stats["cats"])
+        df = add_missing_cols(df, lg_stats["cats"], is_batting)
         # Calculate and combine z-scores
         for cat in lg_stats["cats"]:
             if cat in lg_stats["avg_rates"]:
@@ -260,7 +260,7 @@ def quick_calc(config, df, is_batting):
     
     # Points leagues
     else:
-        df = calc_stats(df, lg_stats["pts"])
+        df = add_missing_cols(df, lg_stats["pts"], is_batting)
         df["total"] = 0
         for cat, value in lg_stats["pts"].items():
             df["total"] += df[cat] * value
@@ -276,6 +276,11 @@ def quick_calc(config, df, is_batting):
 
     df["repl"] = df["pos"].map(lg_stats["repl"])
     df["adj_total"] = df["total"] - df["repl"]
+
+    if "cats" in lg_stats.keys():
+        df = calculate_rate_stats(df, lg_stats["cats"])
+        for cat in lg_stats["cats"]:
+            df = round_column(df, cat, cat)
 
     # Convert to dollar value
     df["$"] = df["adj_total"] * lg_stats["dollar_rate"] + 1
@@ -335,10 +340,9 @@ def build_values(df, lg, is_batting):
         config["repl"] = repl
 
         # Clear out excess columns
-        df = cleanup_cols(df, cats, m_cats)
+        df = cleanup_cols(df, cats, m_cats, is_batting)
     else:
-        df = add_missing_cols(df, is_batting)
-        df = calc_stats(df, pts)
+        df = add_missing_cols(df, pts, is_batting)
         df["total"] = 0
         for cat, value in pts.items():
             df["total"] += df[cat] * value
@@ -382,26 +386,24 @@ def clean_request(lg):
 
 def setup_stats(df, cats, num_players, is_batting):
 
-    df = add_missing_cols(df, is_batting)
-    df = calc_stats(df, cats)
+    df = add_missing_cols(df, cats, is_batting)
     df, avg_rates = calc_rate_stats(df, cats, num_players)
 
     return df, avg_rates
 
 
-def add_missing_cols(df, is_batting):
+def add_missing_cols(df, cats, is_batting):
 
-    if is_batting and "SF" not in df:
+    if is_batting:
+        df["PA"] = df["AB"] + df["BB"] + df["HBP"] + df["SF"]
+
+    if "SF" not in df:
         df["SF"] = 0
-    if not is_batting and "HLD" not in df:
+    if "HLD" in cats and not "HLD" in df:
         df["HLD"] = 0
-    if not is_batting and "QS" not in df:
+    if "QS" in cats and not "QS" in df:
         df["QS"] = 0
 
-    return df
-
-
-def calc_stats(df, cats):
     if "TB" in cats or "SLG" in cats:
         df["TB"] = df["H"] + df["2B"] + (df["3B"] * 2) + (df["HR"] * 3)
     if "1B" in cats:
@@ -415,11 +417,10 @@ def calc_stats(df, cats):
     if "SV+HLD" in cats:
         df["SV+HLD"] = df["SV"] + df["HLD"]
 
-    if "AVG" in cats and "AB" not in df.columns:
-        df["AB"] = df["BFP"] - df["BB"] - df["HBP"]
+    if not is_batting and "AVG" in cats:
+        df["AB"] = df["BFP"] - df["BB"] - df["HBP"] - df["SF"]
 
     return df
-
 
 def calc_rate_stats(df, cats, num_players):
     avg_player = df.head(num_players).mean()
@@ -579,8 +580,22 @@ def calc_dollar_values(df, lg, is_batting):
     return df, dollar_rate
 
 
-def cleanup_cols(df, cats, m_cats):
+def cleanup_cols(df, cats, m_cats, is_batting):
 
+    df = calculate_rate_stats(df, cats)
+
+    if is_batting:
+        appearances = "PA"
+    else:
+        appearances = "IP"
+
+    if appearances in cats:
+        return df[["mlbam_id", "name", "pos"] + cats + m_cats + ["total", "adj_total"]]
+    else:
+        return df[["mlbam_id", "name", "pos", appearances] + cats + m_cats + ["total", "adj_total"]]
+
+
+def calculate_rate_stats(df, cats):
     if "AVG" in cats:
         df["AVG"] = df["H"] / df["AB"]
 
@@ -608,7 +623,7 @@ def cleanup_cols(df, cats, m_cats):
     if "HR/9" in cats:
         df["HR/9"] = df["HR"] / df["IP"] * 9
 
-    return df[["mlbam_id", "name", "pos"] + cats + m_cats + ["total", "adj_total"]]
+    return df
 
 def format_final_columns(df, lg):
     df.sort_values(by="$", ascending=False, inplace=True)
@@ -617,28 +632,35 @@ def format_final_columns(df, lg):
     if lg.scoring_type == League.SCORING_ROTO:
 
         for cat in lg.hitting_categories:
-            if cat in ["AVG","OBP","SLG"]:
-                df[cat] = df[cat].round(3)
-            else:
-                df[cat] = df[cat].astype("Int64")
-
-            df["m" + cat] = df["m" + cat].round(1)
+            col_name = get_col_name(df, cat, True)
+            df = round_column(df, cat, col_name)
+            df["m" + col_name] = df["m" + col_name].round(1)
         
-        for cat in lg.pitching_categories:
-            if cat in ["ERA","WHIP","K/9","BB/9","K/BB"]:
-                df[cat] = df[cat].round(2)
-            elif cat == "AVG":
-                df[cat] = df[cat].round(3)
-            else:
-                df[cat] = df[cat].astype("Int64")
+        if "PA" not in lg.hitting_categories:
+            df = round_column(df, "PA", "PA")
 
-            df["m" + cat] = df["m" + cat].round(1)
+        for cat in lg.pitching_categories:
+            col_name = get_col_name(df, cat, False)
+            df = round_column(df, cat, col_name)
+            df["m" + col_name] = df["m" + col_name].round(1)
+
+        if "IP" not in lg.pitching_categories:
+            df = round_column(df, "IP", "IP")
+
     else:
         for pts in lg.hitting_points:
-            df[pts] = df[pts].astype("Int64")
+            col_name = get_col_name(df, pts, True)
+            df[col_name] = df[col_name].astype("Int64")
+        if "PA" not in lg.hitting_points:
+            df = round_column(df, "PA", "PA")
+
         for pts in lg.pitching_points:
-            df[pts] = df[pts].astype("Int64")
-    
+            col_name = get_col_name(df, pts, False)
+            df[col_name] = df[col_name].astype("Int64")
+        if "IP" not in lg.pitching_points:
+            df = round_column(df, "IP", "IP")
+
+
     df["mlbam_id"] = df["mlbam_id"].astype(int)
     df["total"] = df["total"].round(1)
     df["adj_total"] = df["adj_total"].round(1)
@@ -647,19 +669,30 @@ def format_final_columns(df, lg):
     # Arrange columns a bit
     cols = ["mlbam_id","name","pos","$"]
     if lg.scoring_type == League.SCORING_ROTO:
+        if "PA" not in lg.hitting_categories:
+            cols.append("PA")
         for cat in lg.hitting_categories:
-            cols.append(cat)
+            cols.append(get_col_name(df, cat, True))
+
+        if "IP" not in lg.pitching_categories:
+            cols.append("IP")
         for cat in lg.pitching_categories:
-            cols.append(cat)
+            cols.append(get_col_name(df, cat, False))
+
         for cat in lg.hitting_categories:
-            cols.append("m" + cat)
+            cols.append("m" + get_col_name(df, cat, True))
         for cat in lg.pitching_categories:
-            cols.append("m" + cat)
+            cols.append("m" + get_col_name(df, cat, False))
     else:
-        for cat in lg.hitting_points:
-            cols.append(cat)
-        for cat in lg.pitching_points:
-            cols.append(cat)
+        if "PA" not in lg.hitting_points:
+            cols.append("PA")
+        for pts in lg.hitting_points:
+            cols.append(get_col_name(df, pts, True))
+
+        if "IP" not in lg.pitching_points:
+            cols.append("IP")
+        for pts in lg.pitching_points:
+            cols.append(get_col_name(df, pts, False))
 
     cols.append("total")
     cols.append("adj_total")
@@ -667,6 +700,31 @@ def format_final_columns(df, lg):
     df = df[cols]
 
     return df
+
+def round_column(df, cat, col_name):
+
+    if cat in ["AVG","OBP","SLG"]:
+        df[col_name] = df[col_name].round(3)
+    elif cat in ["ERA","WHIP","K/9","BB/9","HR/9","K/BB"]:
+        df[col_name] = df[col_name].round(2)
+    elif cat in ["IP"]:
+        df[col_name] = df[col_name].round(1)
+    else:
+        df[col_name] = df[col_name].astype("Int64")
+
+    return df
+
+# Any duplicate column names were given a suffix when we merged hitters and pitchers
+def get_col_name(df, cat, is_batting):
+
+    if cat in df.columns:
+        return cat
+    elif is_batting and cat + "_H" in df.columns:
+        return cat + "_H"
+    elif not is_batting and cat + "_P" in df.columns:
+        return cat + "_P"
+    else:
+        return None
 
 
 def load_stats(system, year, lg, is_batting):
