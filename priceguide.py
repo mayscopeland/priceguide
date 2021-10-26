@@ -394,15 +394,15 @@ def setup_stats(df, cats, num_players, is_batting):
 
 def add_missing_cols(df, cats, is_batting):
 
-    if is_batting:
-        df["PA"] = df["AB"] + df["BB"] + df["HBP"] + df["SF"]
-
     if "SF" not in df:
         df["SF"] = 0
     if "HLD" in cats and not "HLD" in df:
         df["HLD"] = 0
     if "QS" in cats and not "QS" in df:
         df["QS"] = 0
+
+    if is_batting:
+        df["PA"] = df["AB"] + df["BB"] + df["HBP"] + df["SF"]
 
     if "TB" in cats or "SLG" in cats:
         df["TB"] = df["H"] + df["2B"] + (df["3B"] * 2) + (df["HR"] * 3)
@@ -660,7 +660,7 @@ def format_final_columns(df, lg):
         if "IP" not in lg.pitching_points:
             df = round_column(df, "IP", "IP")
 
-
+    df["mlbam_id"].fillna(0, inplace=True)
     df["mlbam_id"] = df["mlbam_id"].astype(int)
     df["total"] = df["total"].round(1)
     df["adj_total"] = df["adj_total"].round(1)
