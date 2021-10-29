@@ -480,7 +480,10 @@ def calc_z_scores(df, cats, num_players):
     for cat in cats:
         sd = df.head(num_players)[cat].std(ddof=0)
         mean = df.head(num_players)[cat].mean()
-        df["m" + cat] = (df[cat] - mean) / sd
+        if sd == 0:
+            df["m" + cat] = 0
+        else:
+            df["m" + cat] = (df[cat] - mean) / sd
 
         sds[cat] = sd
         means[cat] = mean
