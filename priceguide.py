@@ -425,7 +425,7 @@ def add_missing_cols(df, cats, is_batting):
     return df
 
 def calc_rate_stats(df, cats, num_players):
-    avg_player = df.head(num_players).mean()
+    avg_player = df.head(num_players).mean(numeric_only=True)
     avg_rates = {}
 
     if "AVG" in cats:
@@ -780,7 +780,6 @@ def load_names(df):
     register = pd.read_csv(
         "https://raw.githubusercontent.com/chadwickbureau/register/master/data/people.csv",
         usecols=["key_mlbam", "name_last", "name_first", "name_suffix"],
-        low_memory=False,
     )
 
     df = df.merge(register.add_suffix("_reg"), how="left", left_on="mlbam_id", right_on="key_mlbam_reg")
