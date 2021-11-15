@@ -29,6 +29,7 @@ class League:
         self.teams = 12
         self.budget = 260
         self.hitting_split = 0.7
+        self.catcher_reduction = 0.9
         self.scoring_type = self.SCORING_ROTO
         self.hitting_categories = ["HR", "SB", "R", "RBI", "AVG"]
         self.pitching_categories = ["W", "SV", "SO", "ERA", "WHIP"]
@@ -394,6 +395,8 @@ def setup_stats(df, cats, num_players, is_batting):
 
 def add_missing_cols(df, cats, is_batting):
 
+    if "HBP" not in df:
+        df["HBP"] = 0
     if "SF" not in df:
         df["SF"] = 0
     if "HLD" in cats and not "HLD" in df:
