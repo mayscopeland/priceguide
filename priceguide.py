@@ -401,6 +401,8 @@ def add_missing_cols(df, cats, is_batting):
         df["SF"] = 0
     if "HLD" in cats and not "HLD" in df:
         df["HLD"] = 0
+    if "SV+HLD" in cats and not "HLD" in df:
+        df["HLD"] = 0
     if "QS" in cats and not "QS" in df:
         df["QS"] = 0
     if not is_batting and not "R" in df:
