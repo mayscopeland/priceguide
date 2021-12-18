@@ -104,8 +104,10 @@ def build_gbp(year):
 
     pivot = df.pivot_table(index="mlbam_id", columns="pos", values=["GS", "G"], aggfunc=np.sum, fill_value=0)
 
-    by_pos = pivot["GS"].copy(deep=True)
-    by_pos["OF"] = pivot["GS"]["LF"] + pivot["GS"]["CF"] + pivot["GS"]["RF"]
+    by_pos = pivot["G"].copy(deep=True)
+
+    # This will overcount OF appearances if someone played multiple OF positions in a game
+    by_pos["OF"] = pivot["G"]["LF"] + pivot["G"]["CF"] + pivot["G"]["RF"]
     by_pos["RP"] = pivot["G"]["P"] - pivot["GS"]["P"]
     by_pos = by_pos.rename(columns={"P":"SP"})
     print(by_pos.head())
