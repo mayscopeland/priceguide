@@ -109,7 +109,8 @@ def build_gbp(year):
     # This will overcount OF appearances if someone played multiple OF positions in a game
     by_pos["OF"] = pivot["G"]["LF"] + pivot["G"]["CF"] + pivot["G"]["RF"]
     by_pos["RP"] = pivot["G"]["P"] - pivot["GS"]["P"]
-    by_pos = by_pos.rename(columns={"P":"SP"})
+    by_pos["SP"] = pivot["GS"]["P"]
+    by_pos.drop("P", axis="columns", inplace=True)
     print(by_pos.head())
     by_pos.to_csv(os.path.dirname(__file__) + "\\games_by_pos\\" + str(year) + ".csv")
 
