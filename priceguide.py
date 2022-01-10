@@ -344,7 +344,7 @@ def build_values(df, lg, is_batting):
         df = cleanup_cols(df, cats, m_cats, is_batting)
     else:
         df = add_missing_cols(df, pts, is_batting)
-        df["total"] = 0
+        df["total"] = 0.0
         for cat, value in pts.items():
             df["total"] += df[cat] * value
 
