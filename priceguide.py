@@ -57,7 +57,7 @@ class League:
 
         # YAHOO
         if league_type == self.LEAGUE_YAHOO:
-            self.hitting_eligibility = 5
+            self.hitting_eligibility = 10
             self.hitting_positions = {
                 "C": 1,
                 "SS": 1,
@@ -197,8 +197,8 @@ def calculate(lg, year, hitters, pitchers):
     pitchers = load_extra(pitchers)
     
     # Add positions
-    hitters = load_games_by_pos(hitters, lg, str(year - 1), True)
-    pitchers = load_games_by_pos(pitchers, lg, str(year - 1), False)
+    hitters = load_games_by_pos(hitters, lg, year, True)
+    pitchers = load_games_by_pos(pitchers, lg, year, False)
 
     # Build values
     hitters, hitting_config = build_values(hitters, lg, True)
@@ -660,13 +660,13 @@ def format_final_columns(df, lg):
     else:
         for pts in lg.hitting_points:
             col_name = get_col_name(df, pts, True)
-            df[col_name] = df[col_name].astype("Int64")
+            df[col_name] = np.floor(pd.to_numeric(df[col_name], errors="coerce")).astype("Int64")
         if "PA" not in lg.hitting_points:
             df = round_column(df, "PA", "PA")
 
         for pts in lg.pitching_points:
             col_name = get_col_name(df, pts, False)
-            df[col_name] = df[col_name].astype("Int64")
+            df[col_name] = np.floor(pd.to_numeric(df[col_name], errors="coerce")).astype("Int64")
         if "IP" not in lg.pitching_points:
             df = round_column(df, "IP", "IP")
 
@@ -796,21 +796,35 @@ def load_names(df):
 
 def load_games_by_pos(df, lg, year, is_batting):
     
-    gbp = pd.read_csv(
-        Path(__file__).parent / "games_by_pos" / (year + ".csv"), index_col="mlbam_id"
-    )
+    if "pos" not in df:
+        df["pos"] = ""
+
+    gbp = pd.read_csv(Path(__file__).parent / "games_by_pos" / (str(year - 1) + ".csv"), index_col="mlbam_id")
     gbp = gbp.add_prefix("G_")
 
+    cur_year_csv = Path(__file__).parent / "games_by_pos" / (str(year) + ".csv")
+    if cur_year_csv.is_file():
+        current_gbp = pd.read_csv(cur_year_csv, index_col="mlbam_id")
+        current_gbp = current_gbp.add_prefix("GC_")
+        gbp = gbp.join(current_gbp, how="outer")
+        gbp = gbp.fillna(0)
+
     gbp["gbp_pos"] = ""
-    # Create boolean columns for positional eligibility
+
     if is_batting:
         for hit_pos in lg.hitting_positions:
-            if "G_" + hit_pos in gbp.columns:
-                gbp.loc[gbp["G_" + hit_pos] >= lg.hitting_eligibility, "gbp_pos"] += hit_pos + "-" 
+            if "G_" + hit_pos in gbp.columns and "GC_" + hit_pos in gbp.columns:
+                gbp.loc[(gbp["G_" + hit_pos] >= lg.hitting_eligibility) | (gbp["GC_" + hit_pos] >= lg.hitting_eligibility), "gbp_pos"] += hit_pos + "-"
+            elif "G_" + hit_pos in gbp.columns:
+                gbp.loc[gbp["G_" + hit_pos] >= lg.hitting_eligibility, "gbp_pos"] += hit_pos + "-"
     else:
-        if "G_SP" in gbp.columns:
+        if "G_SP" in gbp.columns and "GC_SP" in gbp.columns:
+            gbp.loc[(gbp["G_SP"] >= lg.sp_eligibility) | (gbp["GC_SP"] >= lg.sp_eligibility), "gbp_pos"] += "SP-"
+        elif "G_SP" in gbp.columns:
             gbp.loc[gbp["G_SP"] >= lg.sp_eligibility, "gbp_pos"] += "SP-"
-        if "G_RP" in gbp.columns:
+        if "G_RP" in gbp.columns and "GC_RP" in gbp.columns:
+            gbp.loc[(gbp["G_RP"] >= lg.rp_eligibility) | (gbp["GC_RP"] >= lg.rp_eligibility), "gbp_pos"] += "RP-"
+        elif "G_RP" in gbp.columns:
             gbp.loc[gbp["G_RP"] >= lg.rp_eligibility, "gbp_pos"] += "RP-"
     gbp["gbp_pos"] = gbp["gbp_pos"].str.rstrip("-")
 
@@ -818,11 +832,8 @@ def load_games_by_pos(df, lg, year, is_batting):
     df["gbp_pos"] = df["gbp_pos"].fillna("")
     df["pos"] = df["pos"].fillna("")
 
-    if "pos" not in df.columns:
-        df["pos"] = ""
-    
     df.loc[df["gbp_pos"] != "", "pos"] = df["gbp_pos"]
-    
+
     return df
 
 
