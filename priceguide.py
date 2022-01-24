@@ -60,11 +60,11 @@ class League:
             self.hitting_eligibility = 10
             self.hitting_positions = {
                 "C": 1,
-                "SS": 1,
                 "2B": 1,
                 "3B": 1,
-                "OF": 3,
                 "1B": 1,
+                "OF": 3,
+                "SS": 1,
                 "Util": 2,
             }
             self.pitching_positions = {"SP": 2, "RP": 2, "P": 4}
@@ -73,11 +73,11 @@ class League:
         if league_type == self.LEAGUE_CBS_POINTS:
             self.hitting_positions = {
                 "C": 1,
-                "SS": 1,
                 "2B": 1,
                 "3B": 1,
-                "OF": 3,
                 "1B": 1,
+                "OF": 3,
+                "SS": 1,
                 "Util": 1,
             }
             self.pitching_positions = {"SP": 5, "RP": 2}
@@ -91,11 +91,11 @@ class League:
             self.teams = 10
             self.hitting_positions = {
             "C": 1,
-            "SS": 1,
             "2B": 1,
             "3B": 1,
-            "OF": 5,
             "1B": 1,
+            "OF": 5,
+            "SS": 1,
             "MI": 1,
             "CI": 1,
             "Util": 1,
@@ -124,11 +124,11 @@ class League:
             self.pitching_points = {"IP": 3, "H": -1, "ER": -2, "BB": -1, "SO": 1, "W": 6, "SV": 8}
             self.hitting_positions = {
             "C": 1,
-            "SS": 1,
             "2B": 1,
             "3B": 1,
-            "OF": 2,
             "1B": 1,
+            "SS": 1,
+            "OF": 2,
             "Util": 1,
             }
             self.pitching_positions = {"P": 4}
@@ -139,11 +139,11 @@ class League:
             self.hitting_eligibility = 10
             self.hitting_positions = {
                 "C": 1,
-                "SS": 1,
                 "2B": 1,
-                "3B": 1,
                 "OF": 5,
+                "3B": 1,
                 "1B": 1,
+                "SS": 1,
                 "MI": 1,
                 "Util": 1,
             }
@@ -170,11 +170,11 @@ class League:
             self.pitching_points = {"ER": -1.5, "IP": 1.5, "QS": 3, "SV": 6, "SO": 1.5, "W": 3, "H": -0.5, "BB": -0.5}
             self.hitting_positions = {
                 "C": 1,
-                "SS": 1,
+                "OF": 5,
                 "2B": 1,
                 "3B": 1,
-                "OF": 5,
                 "1B": 1,
+                "SS": 1,
                 "Util": 3,
             }
             self.pitching_positions = {"P": 9}
