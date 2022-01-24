@@ -36,11 +36,11 @@ class League:
 
         self.hitting_positions = {
             "C": 2,
-            "SS": 1,
             "2B": 1,
             "3B": 1,
-            "OF": 5,
             "1B": 1,
+            "OF": 5,
+            "SS": 1,
             "MI": 1,
             "CI": 1,
             "Util": 1,
