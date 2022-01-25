@@ -352,6 +352,7 @@ def build_values(df, lg, is_batting):
         df.sort_values(by="total", inplace=True, ascending=False)
 
         df, repl = adjust_by_pos(df, pos, lg.teams)
+        df = scale_catchers(df, lg.catcher_scale)
         df.sort_values(by="adj_total", inplace=True, ascending=False)
         config = {}
         config["pts"] = pts
