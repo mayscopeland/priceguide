@@ -29,7 +29,7 @@ class League:
         self.teams = 12
         self.budget = 260
         self.hitting_split = 0.7
-        self.catcher_reduction = 0.9
+        self.catcher_scale = 0.75
         self.scoring_type = self.SCORING_ROTO
         self.hitting_categories = ["HR", "SB", "R", "RBI", "AVG"]
         self.pitching_categories = ["W", "SV", "SO", "ERA", "WHIP"]
@@ -323,6 +323,7 @@ def build_values(df, lg, is_batting):
             df.sort_values(by="total", inplace=True, ascending=False)
 
             df, repl = adjust_by_pos(df, pos, lg.teams)
+            df = scale_catchers(df, lg.catcher_scale)
             df.sort_values(by="adj_total", inplace=True, ascending=False)
 
             # Check if optimal grouping
@@ -565,6 +566,12 @@ def adjust_by_pos(df, positions, teams):
             )
 
     return df, repl
+
+def scale_catchers(df, catcher_scale):
+
+    df.loc[df["pos"].str.contains("C"), "adj_total"] = df["adj_total"] * catcher_scale
+
+    return df
 
 
 def calc_dollar_values(df, lg, is_batting):
