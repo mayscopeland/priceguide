@@ -67,7 +67,8 @@ class League:
                 "SS": 1,
                 "Util": 2,
             }
-            self.pitching_positions = {"SP": 2, "RP": 2, "P": 4}
+            # Officially it's SP=2, RP=2, P=4
+            self.pitching_positions = {"SP": 5, "RP": 3, "P": 0}
 
         # CBS POINTS
         if league_type == self.LEAGUE_CBS_POINTS:
