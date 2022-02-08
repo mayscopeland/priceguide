@@ -30,6 +30,8 @@ class League:
         self.budget = 260
         self.hitting_split = 0.7
         self.catcher_scale = 0.75
+        self.category_scales = {"SB": 1.0, "SV": 1.0}
+        self.sb_scale = 1.0
         self.scoring_type = self.SCORING_ROTO
         self.hitting_categories = ["HR", "SB", "R", "RBI", "AVG"]
         self.pitching_categories = ["W", "SV", "SO", "ERA", "WHIP"]
@@ -319,6 +321,7 @@ def build_values(df, lg, is_batting):
             df, sds, means = calc_z_scores(df, cats, num_players)
             df = flip_negative_cats(df, cats, is_batting)
 
+            df = scale_categories(df, cats, lg.category_scales)
             df["total"] = df[m_cats].sum(axis=1)
 
             df.sort_values(by="total", inplace=True, ascending=False)
@@ -509,6 +512,15 @@ def flip_negative_cats(df, cats, is_batting):
     for cat in cats:
         if cat in negative_cats:
             df["m" + cat] *= -1
+
+    return df
+
+def scale_categories(df, cats, cat_scales):
+
+    for cat, scale in cat_scales.items():
+        if cat in cats:
+            if cat in df:
+                df["m" + cat] = df["m" + cat] * scale
 
     return df
 
