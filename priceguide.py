@@ -60,6 +60,7 @@ class League:
         # YAHOO
         if league_type == self.LEAGUE_YAHOO:
             self.hitting_eligibility = 10
+            self.hitting_split = 0.65
             self.hitting_positions = {
                 "C": 1,
                 "2B": 1,
