@@ -105,6 +105,7 @@ class League:
             }
 
         if league_type == self.LEAGUE_ESPN_POINTS:
+            self.hitting_split = 0.60
             self.scoring_type = self.SCORING_POINTS
             self.hitting_points = {"R": 1, "RBI": 1, "TB": 1, "BB": 1, "SO": -1, "SB": 1}
             self.pitching_points = {"IP": 3, "H": -1, "ER": -2, "BB": -1, "SO": 1, "W": 5, "L": -5, "SV": 5}
