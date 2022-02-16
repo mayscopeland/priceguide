@@ -511,7 +511,7 @@ def flip_negative_cats(df, cats, is_batting):
     if is_batting:
         negative_cats = ["SO"]
     else:
-        negative_cats = ["ERA","WHIP","AVG","BB/9","HR/9","HR"]
+        negative_cats = ["ERA","WHIP","AVG","BB/9","HR/9","HR","L"]
     
     for cat in cats:
         if cat in negative_cats:
