@@ -433,6 +433,8 @@ def add_missing_cols(df, cats, is_batting):
         df["SV+HLD"] = df["SV"] + df["HLD"]
 
     if not is_batting and "AVG" in cats:
+        if "BFP" not in df:
+            df["BFP"] = df["H"] + df["BB"] + df["HBP"] + df["SF"] + df["IP"] * 3
         df["AB"] = df["BFP"] - df["BB"] - df["HBP"] - df["SF"]
 
     return df
