@@ -4,7 +4,7 @@ import requests
 import os
 
 def main():
-    build_all(2021)
+    build_all(2015)
 
 def build_all(year):
 
@@ -56,6 +56,7 @@ def build_pitching(year):
         for split in record["splits"]:
             player = {}
             player["mlbam_id"] = split["player"]["id"]
+            player["GS"] = split["stat"]["gamesStarted"]
             player["W"] = split["stat"]["wins"]
             player["L"] = split["stat"]["losses"]
             player["CG"] = split["stat"]["completeGames"]
