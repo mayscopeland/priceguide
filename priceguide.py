@@ -533,6 +533,11 @@ def adjust_by_pos(df, positions, teams):
     df["counted"] = False
     df["adj_total"] = -100
 
+    # For this process, we'll count P as SP if this league doesn't use P
+    df["actual_pos"] = df["pos"]
+    if "SP" in positions and "P" not in positions:
+        df.loc[df["pos"] == "", "pos"] = "SP"
+
     for position in positions:
         pos_count = positions[position] * teams
 
@@ -581,6 +586,7 @@ def adjust_by_pos(df, positions, teams):
                 df["total"] - repl[position]
             )
 
+    df["pos"] = df["actual_pos"]
     return df, repl
 
 def scale_catchers(df, catcher_scale):
