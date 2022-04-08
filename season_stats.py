@@ -4,7 +4,7 @@ import requests
 import os
 
 def main():
-    build_all(2015)
+    build_all(2022)
 
 def build_all(year):
 
@@ -42,7 +42,6 @@ def build_batting(year):
 
     df = pd.DataFrame(players)
 
-    print(df.head())
     df.to_csv(os.path.dirname(__file__) + "\\data\\" + str(year) + "Batting.csv", index=False)
 
 def build_pitching(year):
@@ -80,7 +79,6 @@ def build_pitching(year):
 
     df = pd.DataFrame(players)
 
-    print(df.head())
     df.to_csv(os.path.dirname(__file__) + "\\data\\" + str(year) + "Pitching.csv", index=False)
 
 
@@ -112,7 +110,6 @@ def build_gbp(year):
     by_pos["RP"] = pivot["G"]["P"] - pivot["GS"]["P"]
     by_pos["SP"] = pivot["GS"]["P"]
     by_pos.drop("P", axis="columns", inplace=True)
-    print(by_pos.head())
     by_pos.to_csv(os.path.dirname(__file__) + "\\games_by_pos\\" + str(year) + ".csv")
 
 
