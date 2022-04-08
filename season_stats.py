@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import requests
-import os
+from pathlib import Path
 
 def main():
     build_all(2022)
@@ -42,7 +42,7 @@ def build_batting(year):
 
     df = pd.DataFrame(players)
 
-    df.to_csv(os.path.dirname(__file__) + "\\data\\" + str(year) + "Batting.csv", index=False)
+    df.to_csv(Path(__file__).parent / "data" / (str(year) + "Batting.csv"), index=False)
 
 def build_pitching(year):
     url = "http://statsapi.mlb.com/api/v1/stats?stats=season&group=pitching&season={}&playerPool=ALL&limit=5000".format(year)
@@ -79,7 +79,7 @@ def build_pitching(year):
 
     df = pd.DataFrame(players)
 
-    df.to_csv(os.path.dirname(__file__) + "\\data\\" + str(year) + "Pitching.csv", index=False)
+    df.to_csv(Path(__file__).parent / "data" / (str(year) + "Pitching.csv"), index=False)
 
 
 def build_gbp(year):
@@ -110,7 +110,7 @@ def build_gbp(year):
     by_pos["RP"] = pivot["G"]["P"] - pivot["GS"]["P"]
     by_pos["SP"] = pivot["GS"]["P"]
     by_pos.drop("P", axis="columns", inplace=True)
-    by_pos.to_csv(os.path.dirname(__file__) + "\\games_by_pos\\" + str(year) + ".csv")
+    by_pos.to_csv(Path(__file__).parent / "games_by_pos" / (str(year) + ".csv"))
 
 
 if __name__ == "__main__":
