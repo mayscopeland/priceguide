@@ -411,7 +411,13 @@ def add_missing_cols(df, cats, is_batting):
         df["HLD"] = 0
     if "SV+HLD" in cats and not "HLD" in df:
         df["HLD"] = 0
+    if "SV+HLD/2" in cats and not "HLD" in df:
+        df["HLD"] = 0
     if "QS" in cats and not "QS" in df:
+        df["QS"] = 0
+    if "W+QS" in cats and not "QS" in df:
+        df["QS"] = 0
+    if "W+QS-L" in cats and not "QS" in df:
         df["QS"] = 0
     if not is_batting and not "R" in df:
         df["R"] = df["ER"]
@@ -429,8 +435,16 @@ def add_missing_cols(df, cats, is_batting):
         df["RBI+R"] = df["RBI"] + df["R"]
     if "SB-CS" in cats:
         df["SB-CS"] = df["SB"] - df["CS"]
+    if "W-L" in cats:
+        df["W-L"] = df["W"] - df["L"]
+    if "W+QS" in cats:
+        df["W+QS"] = df["W"] + df["QS"]
+    if "W+QS-L" in cats:
+        df["W+QS-L"] = df["W"] + df["QS"] - df["L"]
     if "SV+HLD" in cats:
         df["SV+HLD"] = df["SV"] + df["HLD"]
+    if "SV+HLD/2" in cats:
+        df["SV+HLD/2"] = df["SV"] + df["HLD"] / 2
 
     if not is_batting and "AVG" in cats:
         df["AB"] = df["IP"] * 3 - df["BB"] - df["HBP"] - df["SF"]
@@ -746,7 +760,7 @@ def round_column(df, cat, col_name):
         df[col_name] = df[col_name].round(3)
     elif cat in ["ERA","WHIP","K/9","BB/9","HR/9","K/BB"]:
         df[col_name] = df[col_name].round(2)
-    elif cat in ["IP"]:
+    elif cat in ["IP","SV+HLD/2"]:
         df[col_name] = df[col_name].round(1)
     else:
         df[col_name] = df[col_name].astype("Int64")
