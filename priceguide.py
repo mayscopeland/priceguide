@@ -649,8 +649,11 @@ def cleanup_cols(df, cats, m_cats, is_batting):
 
 
 def calculate_rate_stats(df, cats):
-    if "AVG" in cats:
+    if "AVG" in cats and "AB" in df:
         df["AVG"] = df["H"] / df["AB"]
+
+    if "AVG" in cats and "BFP" in df:
+        df["AVG"] = df["H"] / df["BFP"]
 
     if "OBP" in cats:
         df["OBP"] = (df["H"] + df["BB"] + df["HBP"]) / (df["AB"] + df["BB"] + df["HBP"] + df["SF"])
