@@ -98,19 +98,17 @@ class League:
             "2B": 1,
             "3B": 1,
             "1B": 1,
-            "OF": 5,
+            "OF": 3,
             "SS": 1,
-            "MI": 1,
-            "CI": 1,
             "Util": 1,
             }
+            self.pitching_positions = {"P": 7}
 
         if league_type == self.LEAGUE_ESPN_POINTS:
             self.hitting_split = 0.60
             self.scoring_type = self.SCORING_POINTS
             self.hitting_points = {"R": 1, "RBI": 1, "TB": 1, "BB": 1, "SO": -1, "SB": 1}
-            self.pitching_points = {"IP": 3, "H": -1, "ER": -2, "BB": -1, "SO": 1, "W": 5, "L": -5, "SV": 5}
-            self.pitching_positions = {"P": 9}
+            self.pitching_points = {"IP": 3, "H": -1, "ER": -2, "BB": -1, "SO": 1, "W": 2, "L": -2, "SV": 5, "HLD": 2}
         
         # NFBC
         if league_type == self.LEAGUE_NFBC_MAIN_EVENT:
