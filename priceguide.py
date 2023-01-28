@@ -794,9 +794,6 @@ def load_stats(system, year, lg, is_batting):
 
 def load_extra(df):
 
-    if "mlbam_id" not in df.columns:
-        df = load_mlbam_id(df)
-
     if "name" not in df.columns:
         if "name_last" in df.columns and "name_first" in df.columns:
             df["name"] = df["name_first"] + " " + df["name_last"]
@@ -805,36 +802,18 @@ def load_extra(df):
 
     return df
 
-
-def load_mlbam_id(df):
-
-    register = pd.DataFrame()
-    register = pd.read_csv(
-        "https://raw.githubusercontent.com/chadwickbureau/register/master/data/people.csv",
-        usecols=["key_fangraphs", "key_mlbam"],
-        low_memory=False,
-    ).dropna()
-    register["key_fangraphs"] = register["key_fangraphs"].astype(int).astype(str)
-    df = df.join(register, how="left")
-
-    df = df.rename(columns={"key_mlbam": "mlbam_id"})
-    df["mlbam_id"] = df["mlbam_id"].astype(int)
-    df = df.set_index("mlbam_id")
-
-    return df
-
-
 def load_names(df):
+    filepath = Path(__file__).parent.parent
     register = pd.DataFrame()
     register = pd.read_csv(
-        "https://raw.githubusercontent.com/chadwickbureau/register/master/data/people.csv",
-        usecols=["key_mlbam", "name_last", "name_first", "name_suffix"],
+        filepath / "SFBB Player ID Map - PLAYERIDMAP.csv",
+        usecols=["MLBID", "MLBNAME"],
     )
 
-    df = df.merge(register.add_suffix("_reg"), how="left", left_on="mlbam_id", right_on="key_mlbam_reg")
+    df = df.merge(register, how="left", left_on="mlbam_id", right_on="MLBID")
 
-    df["name"] = df["name_first_reg"] + " " + df["name_last_reg"]
-    df.loc[df["name_suffix_reg"].notna(), "name"] = df["name"] + " " + df["name_suffix_reg"]
+    df.rename(columns={"MLBNAME": "name"}, inplace=True)
+    df.drop(["MLBID"], axis="columns", inplace=True)
 
     return df
 
