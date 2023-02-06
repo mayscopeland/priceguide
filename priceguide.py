@@ -241,6 +241,11 @@ def quick_calc(config, df, is_batting):
                     df["mOBP"] = ((df["H"] + df["BB"] + df["HBP"]) - (df["AB"] + df["BB"] + df["HBP"] + df["SF"]) * lg_stats["avg_rates"]["OBP"]) / lg_stats["sds"]["OBP"]
                 elif cat == "SLG":
                     df["mSLG"] = ((df["H"] + df["2B"] + df["3B"]*2 + df["HR"]*3) - (df["AB"] * lg_stats["avg_rates"]["SLG"])) / lg_stats["sds"]["SLG"]
+                elif cat == "OPS":
+                    df["mOPS"] = (
+                        ((df["H"] + df["BB"] + df["HBP"]) - (df["AB"] + df["BB"] + df["HBP"] + df["SF"]) * lg_stats["avg_rates"]["OBP"]) +
+                        ((df["H"] + df["2B"] + df["3B"]*2 + df["HR"]*3) - (df["AB"] * lg_stats["avg_rates"]["SLG"]))
+                    ) / lg_stats["sds"]["OPS"]
                 elif cat == "ERA":
                     df["mERA"] = (df["ER"] - (df["IP"] * lg_stats["avg_rates"]["ERA"])) / lg_stats["sds"]["ERA"]
                 elif cat == "WHIP":
@@ -423,7 +428,7 @@ def add_missing_cols(df, cats, is_batting):
     if is_batting:
         df["PA"] = df["AB"] + df["BB"] + df["HBP"] + df["SF"]
 
-    if "TB" in cats or "SLG" in cats:
+    if "TB" in cats or "SLG" in cats or "OPS" in cats:
         df["TB"] = df["H"] + df["2B"] + (df["3B"] * 2) + (df["HR"] * 3)
     if "1B" in cats:
         df["1B"] = df["H"] - df["2B"] - df["3B"] - df["HR"]
@@ -466,6 +471,16 @@ def calc_rate_stats(df, cats, num_players):
     if "SLG" in cats:
         df["SLG"] = calc_rate_stat(df, ["TB"], ["AB"], avg_player)
         avg_rates["SLG"] = avg_player["TB"] / avg_player["AB"]
+
+    if "OPS" in cats:
+        num = ["H", "BB", "HBP"]
+        den = ["AB", "BB", "HBP", "SF"]
+        df["OBP"] = calc_rate_stat(df, num, den, avg_player)
+        df["SLG"] = calc_rate_stat(df, ["TB"], ["AB"], avg_player)
+        df["OPS"] = df["OBP"] + df["SLG"]
+        avg_rates["OBP"] = (avg_player["H"] + avg_player["BB"] + avg_player["HBP"]) / (avg_player["AB"] + avg_player["BB"] + avg_player["HBP"] + avg_player["SF"])
+        avg_rates["SLG"] = avg_player["TB"] / avg_player["AB"]
+        avg_rates["OPS"] = avg_rates["OBP"] + avg_rates["SLG"]
 
     if "ERA" in cats:
         df["ERA"] = calc_rate_stat(df, ["ER"], ["IP"], avg_player)
@@ -659,6 +674,9 @@ def calculate_rate_stats(df, cats):
     if "SLG" in cats:
         df["SLG"] = df["TB"] / df["AB"]
 
+    if "OPS" in cats:
+        df["OPS"] = ((df["H"] + df["BB"] + df["HBP"]) / (df["AB"] + df["BB"] + df["HBP"] + df["SF"])) + (df["TB"] / df["AB"])
+
     if "ERA" in cats:
         df["ERA"] = df["ER"] / df["IP"] * 9
     
@@ -757,7 +775,7 @@ def format_final_columns(df, lg):
 
 def round_column(df, cat, col_name):
 
-    if cat in ["AVG","OBP","SLG"]:
+    if cat in ["AVG","OBP","SLG","OPS"]:
         df[col_name] = df[col_name].round(3)
     elif cat in ["ERA","WHIP","K/9","BB/9","HR/9","K/BB"]:
         df[col_name] = df[col_name].round(2)
@@ -809,6 +827,8 @@ def load_names(df):
         filepath / "SFBB Player ID Map - PLAYERIDMAP.csv",
         usecols=["MLBID", "MLBNAME"],
     )
+
+    register.drop_duplicates(["MLBID"], inplace=True)
 
     df = df.merge(register, how="left", left_on="mlbam_id", right_on="MLBID")
 
